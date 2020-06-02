@@ -28,7 +28,7 @@ def _show_image(image, window_title, blocking=True, mask=None, return_markers=Fa
     exec_code = app.exec_()
     # TODO: non blocking viewers!
     if mask is not None:
-        w.image_viewer.add_mask_image(mask)
+        w.image_viewer.add_mask(mask)
 
     if return_markers:
         return markers

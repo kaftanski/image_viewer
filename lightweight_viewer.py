@@ -35,7 +35,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
 
         self.image_viewer = ImageViewer(image, parent=self, p_markers=p_markers)
         if mask is not None:
-            self.image_viewer.add_mask_image(mask)
+            self.image_viewer.add_mask(mask)
 
         self.setCentralWidget(self.image_viewer)
         # self.addToolBar(NavigationToolbar(self.image_viewer.canvas, self))
@@ -138,7 +138,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             print('Loading mask ' + file_path)
 
             image = sitk.ReadImage(file_path)
-            self.image_viewer.add_mask_image(image, color='r')
+            self.image_viewer.add_mask(image, color='r')
 
     def save_current_view(self):
         file_path = self.file_dialog('Save File', 'Image (*.png, *.PNG)', save=True)
@@ -183,8 +183,8 @@ class ImageViewer(QtWidgets.QWidget):
         self.canvas = FigureCanvas(Figure(figsize=(5, 5)))
         self.canvas.setParent(self)
         self.ax = self.canvas.figure.subplots()
-        #self.ax.axis('off')
-        #self.canvas.figure.subplots_adjust(0, 0, 1, 1)
+        self.ax.axis('off')
+        self.canvas.figure.subplots_adjust(0, 0, 1, 1)
 
         self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
 
@@ -210,8 +210,8 @@ class ImageViewer(QtWidgets.QWidget):
 
         self.show()
 
-        self.add_mask_image(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
-        self.add_mask_image(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/02/VSD.Brain.02.O.OT_reg.nii.gz'), color='g')
+        self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
+        self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/02/VSD.Brain.02.O.OT_reg.nii.gz'), color='g')
 
         # for i in range(5):
         #     self.add_marker([1, i, self.current_slice])
@@ -226,8 +226,8 @@ class ImageViewer(QtWidgets.QWidget):
         if self.im_plot is not None:
             self.im_plot.remove()
 
-        self.im_plot = self.ax.imshow(self.image_array[get_3d_plane_index(self.current_slice, self.orientation)],
-                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation),
+        self.im_plot = self.ax.imshow(self.image_array[index_compatibility(get_3d_plane_index(self.current_slice, self.orientation))],
+                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()),
                                       cmap='gray', origin='lower')
 
         min_grey = self.image_array.min()
@@ -287,16 +287,17 @@ class ImageViewer(QtWidgets.QWidget):
             new_slice = lower if new_slice < lower else upper - 1
 
         self.current_slice = new_slice
+
         img_slice = self.image_array[index_compatibility(get_3d_plane_index(slice_index=new_slice, orientation=self.orientation))]
-        self.im_plot.set_data(img_slice)
-        # extent = self.im_plot.get_extent()
-        aspect = get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation)
-        # self.ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
-        print(aspect)
+
         # TODO: set extent to be according to dimensions so that nothing gets squished
-        x_max, y_max = img_slice.shape
+        y_max, x_max = img_slice.shape
         self.ax.set_xlim([0, x_max])
         self.ax.set_ylim([0, y_max])
+
+        self.im_plot.set_data(img_slice)
+        aspect = get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize())
+        print(aspect)
         self.ax.set_aspect(aspect)
 
         # self.pixel_info_label.set_coordinate(self.orientation, new_slice)
@@ -307,7 +308,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.canvas.draw()
 
     def get_slice_range(self):
-        return 0, self.image_array.shape[self.orientation]
+        return 0, self.image.GetSize()[self.orientation]
 
     def update_slider(self):
         self.slice_slider.setRange(self.get_slice_range()[0], self.get_slice_range()[1]-1)
@@ -343,7 +344,7 @@ class ImageViewer(QtWidgets.QWidget):
     def scatter_markers(self):
         markers_in_slice = []
         for m in self.markers:
-            pixel_pos = np.array(m.world_position)
+            pixel_pos = np.array(m.pixel_position)
             if abs(pixel_pos[self.orientation] - self.current_slice) < 0.5:
                 markers_in_slice.append(pixel_pos[np.arange(3) != self.orientation])
 
@@ -354,7 +355,7 @@ class ImageViewer(QtWidgets.QWidget):
             self.marker_plot.remove()
             self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
 
-    def add_mask_image(self, binary_image, color='b'):
+    def add_mask(self, binary_image, color='b'):
         # TODO assert spacing and dimensions etc equal
         #assert vtk_binary_image.GetExtent() == self.vtk_image_viewer.GetInput().GetExtent()
 
@@ -365,7 +366,9 @@ class ImageViewer(QtWidgets.QWidget):
     def update_masks(self):
         self.clear_masks()
         for m in self.masks.keys():
-            self.masks[m] = add_mask_image(self.ax, m.get_slice(self.current_slice, self.orientation), alpha=m.alpha, color=m.color)
+            self.masks[m] = add_mask_to_image(self.ax, m.get_slice(self.current_slice, self.orientation),
+                                              aspect=get_aspect_ratio_for_plane(m.get_spacing(), self.orientation, self.image.GetSize()),
+                                              alpha=m.alpha, color=m.color)
 
     def set_image(self, image):
         self.image = image
@@ -394,7 +397,7 @@ class ImageViewer(QtWidgets.QWidget):
         if pixel_coords is None:
             self.pixel_info_label.clear()
         else:
-            x, y, z = index_compatibility([int(ind) for ind in pixel_coords])  # attention to different indexing of np array from itk image
+            x, y, z = [int(ind) for ind in pixel_coords]  # attention to different indexing of np array from itk image
             self.pixel_info_label.set_values(x, y, z, self.image.GetPixel(x, y, z))
 
     def wheelEvent(self, e):
@@ -532,12 +535,16 @@ class ImageViewerInteractor:
 class ImageMask:
     def __init__(self, itk_binary_image, alpha=0.3, color='r'):
         self.itk_mask = itk_binary_image
+        # self.itk_mask.SetSpacing([0.9, 0.45, 3])  # Todo: testing
         self.mask_as_array = sitk.GetArrayFromImage(self.itk_mask)#.swapaxes(0, 2).swapaxes(0, 1)
         self.alpha = alpha
         self.color = color
 
     def get_slice(self, slice_index, orientation):
-        return self.mask_as_array[get_3d_plane_index(slice_index, orientation)]
+        return self.mask_as_array[index_compatibility(get_3d_plane_index(slice_index, orientation))]
+
+    def get_spacing(self):
+        return self.itk_mask.GetSpacing()
 
 
 class ImageMarker:
@@ -545,11 +552,11 @@ class ImageMarker:
 
     def __init__(self, world_position):
         assert len(world_position) == 3
-        self.world_position = world_position
+        self.pixel_position = world_position
         # TODO: dont need world but pixel position for seed points
 
     def __str__(self):
-        return 'ImageMarker at world position ({}, {}, {})'.format(*self.world_position)
+        return 'ImageMarker at pixel position ({}, {}, {})'.format(*self.pixel_position)
 
 
 def get_3d_plane_index(slice_index, orientation):
@@ -558,10 +565,10 @@ def get_3d_plane_index(slice_index, orientation):
     return tuple(index)
 
 
-def get_aspect_ratio_for_plane(spacing, orientation):
-    dims = list(SLICE_ORIENTATION.values())
+def get_aspect_ratio_for_plane(spacing, orientation, image_dimensions):
+    dims = list(sorted(SLICE_ORIENTATION.values()))
     dims.remove(orientation)
-    ratio = spacing[dims[0]] / spacing[dims[1]]
+    ratio = spacing[dims[1]] * image_dimensions[1] / (spacing[dims[0]] * image_dimensions[0])
     return ratio
 
 
@@ -581,14 +588,14 @@ def world2pix(index, spacing):
     return tuple(i/s for i, s in zip(index, spacing))
 
 
-def add_mask_image(ax, mask, alpha=0.3, color='r'):
+def add_mask_to_image(ax, mask, aspect, alpha=0.3, color='r'):
     """ can be multilabel, if mask is given as (x, y, l) with l different binary images """
     if mask.sum() == 0:
         return None
 
     cmap = ListedColormap([color])
     mask = np.ma.masked_where(mask == 0, mask)
-    plot = ax.matshow(mask, cmap=cmap, alpha=alpha, origin='lower')  # todo: place origin of image and matrix in rcParams
+    plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha, origin='lower')  # todo: place origin of image and matrix in rcParams
 
     return plot
 
