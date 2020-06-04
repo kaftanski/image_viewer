@@ -178,13 +178,14 @@ class ImageViewer(QtWidgets.QWidget):
         self.current_level = 0
 
         self.greyval_range = [0, 0]
+        self.current_zoom = 100
 
         # init the MPL canvas
-        self.canvas = FigureCanvas(Figure(figsize=(5, 5), facecolor='black'))
+        self.canvas = FigureCanvas(Figure(figsize=(5, 5), facecolor='white'))
         self.canvas.setParent(self)
         self.ax = self.canvas.figure.subplots()
-        self.ax.axis('off')
-        self.canvas.figure.subplots_adjust(0, 0, 1, 1)
+        # self.ax.axis('off')
+        # self.canvas.figure.subplots_adjust(0, 0, 1, 1)
 
         self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
 
@@ -303,6 +304,36 @@ class ImageViewer(QtWidgets.QWidget):
 
         self.canvas.draw()
 
+    def zoom(self, center_x, center_y, percent):
+        if percent < 100:
+            return
+
+        self.current_zoom = percent
+
+        plane_dimensions = list(self.image.GetSize()[d] for d in range(3) if d != self.orientation)
+        half_range_x = plane_dimensions[0] / 2 / (percent / 100)
+        half_range_y = plane_dimensions[1] / 2 / (percent / 100)
+        # print(half_range_x)
+
+        x_limits = [center_x - half_range_x, center_x + half_range_x]
+        y_limits = [center_y - half_range_y, center_y + half_range_y]
+
+        # adjust limits to keep the image in the figure
+        for dim, limits in enumerate([x_limits, y_limits]):
+            shift = 0
+            if limits[0] < 0:
+                shift = -limits[0]
+            elif limits[1] > plane_dimensions[dim] - 1:
+                shift = ((plane_dimensions[dim] - 1) - limits[1])
+
+            limits[0] += shift
+            limits[1] += shift
+
+        self.ax.set_xlim(*x_limits)
+        self.ax.set_ylim(*y_limits)
+
+        self.canvas.draw()
+
     def get_slice_range(self):
         return 0, self.image.GetSize()[self.orientation]
 
@@ -392,7 +423,7 @@ class ImageViewer(QtWidgets.QWidget):
             x, y, z = [int(ind) for ind in pixel_coords]  # attention to different indexing of np array from itk image
             try:
                 self.pixel_info_label.set_values(x, y, z, self.image.GetPixel(x, y, z))
-            except RuntimeError:
+            except (RuntimeError, TypeError):
                 # gets thrown if x, y, z are out of bounds of the image (this happens on the edges of the figure)
                 return
 
@@ -434,7 +465,8 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('button_release_event', self.handle_mouse_button_up)
         self.iv.canvas.mpl_connect('motion_notify_event', self.on_mouse_motion)
 
-        self.last_mouse_position = None
+        self.current_mouse_position_in_figure = [None, None]
+        self.window_level_start_position = None
         self.mouse_wheel_step_residual = 0  # accumulating mousewheel movements, if they dont add up to a whole step
 
     def handle_mouse_button_down(self, event):
@@ -452,24 +484,26 @@ class ImageViewerInteractor:
             self.on_right_button_up(event)
 
     def on_mouse_motion(self, event):
+        self.current_mouse_position_in_figure = [event.xdata, event.ydata]
+
         if event.xdata is not None and event.ydata is not None:
             # update mouse cursor position
             position = [event.xdata, event.ydata]
             position.insert(self.iv.orientation, self.iv.current_slice)
             self.iv.show_pixel_info(position)
 
-        if self.last_mouse_position is not None:
+        if self.window_level_start_position is not None:
             # window levelling
 
             # move window by x movement
             # move level by y movement
-            dx = event.x - self.last_mouse_position[0]
-            dy = event.y - self.last_mouse_position[1]
+            dx = event.x - self.window_level_start_position[0]
+            dy = event.y - self.window_level_start_position[1]
 
             if event.x is not None:
-                self.last_mouse_position[0] = event.x
+                self.window_level_start_position[0] = event.x
             if event.y is not None:
-                self.last_mouse_position[1] = event.y
+                self.window_level_start_position[1] = event.y
 
             gain = 5  # gain to amplify or decrease the change
             new_window = self.iv.current_window + dx * gain
@@ -497,11 +531,23 @@ class ImageViewerInteractor:
         else:
             return
 
-        # print(y_scroll)
-        # print('Moving slice by {} steps'.format(steps))
-        self.iv.move_slice(steps)
-        self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
-        self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
+        if event.modifiers() == QtCore.Qt.ControlModifier:
+            if any(coord is None for coord in self.current_mouse_position_in_figure):
+                # choos the figure center as zoom center if mouse outside of figure
+                center_x = (self.iv.ax.get_xlim()[1] - self.iv.ax.get_xlim()[0]) / 2
+                center_y = (self.iv.ax.get_ylim()[1] - self.iv.ax.get_ylim()[0]) / 2
+            else:
+                center_x = self.current_mouse_position_in_figure[0]
+                center_y = self.current_mouse_position_in_figure[1]
+
+            # zooming steps * 20 %
+            new_zoom = self.iv.current_zoom + steps * 20
+            self.iv.zoom(center_x=center_x, center_y=center_y, percent=new_zoom)
+        else:
+            # move slice by steps
+            self.iv.move_slice(steps)
+            self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
+            self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
 
     def on_left_button_down(self, event):
         if event.xdata is not None and event.ydata is not None:
@@ -516,10 +562,10 @@ class ImageViewerInteractor:
 
     def on_right_button_down(self, event):
         # start window levelling
-        self.last_mouse_position = [event.x, event.y]
+        self.window_level_start_position = [event.x, event.y]
 
     def on_right_button_up(self, event):
-        self.last_mouse_position = None
+        self.window_level_start_position = None
 
     # def on_mousewheel_forward(self, event):
     #     self.iv.move_slice_forward()
@@ -560,8 +606,7 @@ def get_3d_plane_index(slice_index, orientation):
 
 
 def get_aspect_ratio_for_plane(spacing, orientation, image_dimensions):
-    dims = list(sorted(SLICE_ORIENTATION.values()))
-    dims.remove(orientation)
+    dims = list(d for d in range(3) if d != orientation)
     ratio = spacing[dims[1]] * image_dimensions[1] / (spacing[dims[0]] * image_dimensions[0])
     return ratio
 
