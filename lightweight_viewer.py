@@ -1,14 +1,20 @@
 from math import floor, copysign
 from time import time
+
 import SimpleITK as sitk
 import numpy as np
 from PyQt5.QtWidgets import QAction
-from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 # from PyQt5 import QtWidgets
+
+import matplotlib as mpl
+from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import MouseButton
+
+mpl.rcParams['image.origin'] = 'lower'
+mpl.rcParams['image.cmap'] = 'gray'
 
 
 SLICE_ORIENTATION_XY = 2
@@ -150,12 +156,6 @@ class LightWeightViewer(QtWidgets.QMainWindow):
 
 
 class ImageViewer(QtWidgets.QWidget):
-    # TODO:
-    #  image x
-    #  mask x
-    #  markers x
-    #  slice-slider x
-    #  different orientations of slices x
     def __init__(self, image_data: sitk.Image = None, parent=None, p_markers=None):
         super(ImageViewer, self).__init__(parent)
         self.viewportsize_x = 800
@@ -213,13 +213,10 @@ class ImageViewer(QtWidgets.QWidget):
         # self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
         # self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/02/VSD.Brain.02.O.OT_reg.nii.gz'), color='g')
 
-        # for i in range(5):
-        #     self.add_marker([1, i, self.current_slice])
-
     def init_image(self):
         # DON'T swap axes, in order to keep the fastest dimension of the np array the first
         # -> z-slices are the most performant
-        self.image_array = sitk.GetArrayFromImage(self.image)#.swapaxes(0, 2)  # .swapaxes(0, 1)  # swap x and z dimension because sitk indexes (z,y,x)
+        self.image_array = sitk.GetArrayFromImage(self.image)
 
         self.current_slice = self.get_slice_range()[1] // 2
 
@@ -227,8 +224,7 @@ class ImageViewer(QtWidgets.QWidget):
             self.im_plot.remove()
 
         self.im_plot = self.ax.imshow(self.image_array[index_compatibility(get_3d_plane_index(self.current_slice, self.orientation))],
-                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()),
-                                      cmap='gray', origin='lower')
+                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()))
 
         min_grey = self.image_array.min()
         max_grey = self.image_array.max()
@@ -260,11 +256,6 @@ class ImageViewer(QtWidgets.QWidget):
         if window < 0:
             # set a minimum level (could be even smaller in case of normalized images with values in [0,1])
             window = 1e-5
-
-        # if level < self.greyval_range[0]:
-        #     level = self.greyval_range[0]
-        # elif level > self.greyval_range[1]:
-        #     level = self.greyval_range[1]
 
         self.current_window = window
         self.current_level = level
@@ -302,8 +293,7 @@ class ImageViewer(QtWidgets.QWidget):
         # setting data on the current image plot, but this way the extent is updated correctly
         self.im_plot.remove()
         self.im_plot = self.ax.imshow(img_slice, vmin=self.current_level - half_window, vmax=self.current_level + half_window,
-                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()),
-                                      cmap='gray', origin='lower')
+                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()))
 
         self.pixel_info_label.set_coordinate(self.orientation, new_slice)
         self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
@@ -319,10 +309,6 @@ class ImageViewer(QtWidgets.QWidget):
     def update_slider(self):
         self.slice_slider.setRange(self.get_slice_range()[0], self.get_slice_range()[1]-1)
         self.slice_slider.setValue(self.current_slice)
-
-    # def move_slice_forward(self):  # TODO: change this ugly workaround
-    #     # moves the slider, which in turn changes the slice
-    #     self.slice_slider.setValue(self.current_slice + 1)
 
     def move_slice(self, delta):
         # moves the slider, which in turn changes the slice
@@ -545,8 +531,7 @@ class ImageViewerInteractor:
 class ImageMask:
     def __init__(self, itk_binary_image, alpha=0.3, color='r'):
         self.itk_mask = itk_binary_image
-        # self.itk_mask.SetSpacing([0.9, 0.45, 3])  # Todo: testing
-        self.mask_as_array = sitk.GetArrayFromImage(self.itk_mask)#.swapaxes(0, 2).swapaxes(0, 1)
+        self.mask_as_array = sitk.GetArrayFromImage(self.itk_mask)
         self.alpha = alpha
         self.color = color
 
@@ -560,10 +545,9 @@ class ImageMask:
 class ImageMarker:
     STANDARD_COLOR = 'b'
 
-    def __init__(self, world_position):
-        assert len(world_position) == 3
-        self.pixel_position = world_position
-        # TODO: dont need world but pixel position for seed points
+    def __init__(self, pixel_position):
+        assert len(pixel_position) == 3
+        self.pixel_position = pixel_position
 
     def __str__(self):
         return 'ImageMarker at pixel position ({}, {}, {})'.format(*self.pixel_position)
@@ -605,7 +589,7 @@ def add_mask_to_image(ax, mask, aspect, alpha=0.3, color='r'):
 
     cmap = ListedColormap([color])
     mask = np.ma.masked_where(mask == 0, mask)
-    plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha, origin='lower')  # todo: place origin of image and matrix in rcParams
+    plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha)  # todo: place origin of image and matrix in rcParams
 
     return plot
 
