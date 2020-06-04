@@ -307,6 +307,10 @@ class ImageViewer(QtWidgets.QWidget):
         self.pixel_info_label.set_coordinate(self.orientation, new_slice)
         self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
 
+        # reset zoom factor. TODO: keep zoom?
+        self.zoom_label.setText('100 %')
+        self.current_zoom = 100
+
         self.update_masks()
         self.scatter_markers()
 
