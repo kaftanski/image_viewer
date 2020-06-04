@@ -1,5 +1,5 @@
 from math import floor, copysign
-
+from time import time
 import SimpleITK as sitk
 import numpy as np
 from PyQt5.QtWidgets import QAction
@@ -167,7 +167,7 @@ class ImageViewer(QtWidgets.QWidget):
         if image_data is None:
             # load example image
             image_data = sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
-        # image_data.SetSpacing([0.9, 0.45, 3])  # todo: testing
+
         self.image = image_data
         self.image_array = None
         self.current_slice = 0
@@ -180,7 +180,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.greyval_range = [0, 0]
 
         # init the MPL canvas
-        self.canvas = FigureCanvas(Figure(figsize=(5, 5)))
+        self.canvas = FigureCanvas(Figure(figsize=(5, 5), facecolor='black'))
         self.canvas.setParent(self)
         self.ax = self.canvas.figure.subplots()
         self.ax.axis('off')
@@ -210,8 +210,8 @@ class ImageViewer(QtWidgets.QWidget):
 
         self.show()
 
-        self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
-        self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/02/VSD.Brain.02.O.OT_reg.nii.gz'), color='g')
+        # self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
+        # self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/02/VSD.Brain.02.O.OT_reg.nii.gz'), color='g')
 
         # for i in range(5):
         #     self.add_marker([1, i, self.current_slice])
@@ -282,6 +282,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.set_window_level(window, level)
 
     def update_slice(self, new_slice):
+        # todo: Blitting
         lower, upper = self.get_slice_range()
         if not lower <= new_slice < upper:
             new_slice = lower if new_slice < lower else upper - 1
@@ -290,18 +291,23 @@ class ImageViewer(QtWidgets.QWidget):
 
         img_slice = self.image_array[index_compatibility(get_3d_plane_index(slice_index=new_slice, orientation=self.orientation))]
 
-        # TODO: set extent to be according to dimensions so that nothing gets squished
+        # set extent to be according to dimensions so that nothing gets squished
         y_max, x_max = img_slice.shape
         self.ax.set_xlim([0, x_max])
         self.ax.set_ylim([0, y_max])
 
-        self.im_plot.set_data(img_slice)
-        aspect = get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize())
-        print(aspect)
-        self.ax.set_aspect(aspect)
+        half_window = self.current_window / 2
 
-        # self.pixel_info_label.set_coordinate(self.orientation, new_slice)
-        # self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
+        # remove the image plot and redraw. this is a little less performant than
+        # setting data on the current image plot, but this way the extent is updated correctly
+        self.im_plot.remove()
+        self.im_plot = self.ax.imshow(img_slice, vmin=self.current_level - half_window, vmax=self.current_level + half_window,
+                                      aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()),
+                                      cmap='gray', origin='lower')
+
+        self.pixel_info_label.set_coordinate(self.orientation, new_slice)
+        self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
+
         self.update_masks()
         self.scatter_markers()
 
@@ -398,7 +404,11 @@ class ImageViewer(QtWidgets.QWidget):
             self.pixel_info_label.clear()
         else:
             x, y, z = [int(ind) for ind in pixel_coords]  # attention to different indexing of np array from itk image
-            self.pixel_info_label.set_values(x, y, z, self.image.GetPixel(x, y, z))
+            try:
+                self.pixel_info_label.set_values(x, y, z, self.image.GetPixel(x, y, z))
+            except RuntimeError:
+                # gets thrown if x, y, z are out of bounds of the image (this happens on the edges of the figure)
+                return
 
     def wheelEvent(self, e):
         # TODO: change the pyqt handler to not be this class... maybe emit signal
