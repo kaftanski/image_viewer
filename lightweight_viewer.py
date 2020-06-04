@@ -104,19 +104,29 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         marker_submenu = view_menu.addMenu('&Marker')
         marker_submenu.addActions([clear_markers_action, remove_last_marker_action])
 
+        zoom_action = QAction('&Zoom...', self)
+        zoom_action.setStatusTip('Choose a zoom factor')
+        zoom_action.triggered.connect(self.zoom_dialog)
+
         reset_wl_action = QAction('&Reset Window / Level', self)
         reset_wl_action.setStatusTip('Reset window-levelling to span the entire image range')
         reset_wl_action.triggered.connect(self.image_viewer.reset_window_level)
 
-        view_menu.addAction(reset_wl_action)
+        view_menu.addActions([zoom_action, reset_wl_action])
 
-    def keyPressEvent(self, e):
-        if e.text() == 'x':
-            self.image_viewer.change_orientation(SLICE_ORIENTATION['yz'])
-        elif e.text() == 'y':
-            self.image_viewer.change_orientation(SLICE_ORIENTATION['xz'])
-        elif e.text() == 'z':
-            self.image_viewer.change_orientation(SLICE_ORIENTATION['xy'])
+    # def keyPressEvent(self, e):
+    #     if e.text() == 'x':
+    #         self.image_viewer.change_orientation(SLICE_ORIENTATION['yz'])
+    #     elif e.text() == 'y':
+    #         self.image_viewer.change_orientation(SLICE_ORIENTATION['xz'])
+    #     elif e.text() == 'z':
+    #         self.image_viewer.change_orientation(SLICE_ORIENTATION['xy'])
+
+    def zoom_dialog(self):
+        new_zoom_factor, ok = QtWidgets.QInputDialog.getInt(self, 'Zoom', 'Percentage:', min=100, step=20,
+                                                        value=self.image_viewer.current_zoom)
+        if ok:
+            self.image_viewer.zoom(percent=new_zoom_factor)
 
     def file_dialog(self, caption, filter, save=False):
         # todo: change standard directory to cwd (maybe something else)
@@ -148,11 +158,13 @@ class LightWeightViewer(QtWidgets.QMainWindow):
 
     def save_current_view(self):
         file_path = self.file_dialog('Save File', 'Image (*.png, *.PNG)', save=True)
-        if file_path[-4:].lower() != '.png':
-            file_path += '.png'
 
-        print('Saving view to {}'.format(file_path))
-        self.image_viewer.canvas.print_figure(filename=file_path, dpi=200, bbox_inches=0)
+        if file_path != '':
+            if file_path[-4:].lower() != '.png':
+                file_path += '.png'
+
+            print('Saving view to {}'.format(file_path))
+            self.image_viewer.canvas.print_figure(filename=file_path, dpi=200, bbox_inches=0)
 
 
 class ImageViewer(QtWidgets.QWidget):
@@ -316,16 +328,21 @@ class ImageViewer(QtWidgets.QWidget):
 
         self.canvas.draw()
 
-    def zoom(self, center_x, center_y, percent):
+    def zoom(self, percent, center_x=None, center_y=None):
         if percent < 100:
             return
 
         self.current_zoom = percent
 
         plane_dimensions = list(self.image.GetSize()[d] for d in range(3) if d != self.orientation)
+
+        if center_x is None:
+            center_x = (plane_dimensions[0] - 1) / 2
+        if center_y is None:
+            center_y = (plane_dimensions[1] - 1) / 2
+
         half_range_x = plane_dimensions[0] / 2 / (percent / 100)
         half_range_y = plane_dimensions[1] / 2 / (percent / 100)
-        # print(half_range_x)
 
         x_limits = [center_x - half_range_x, center_x + half_range_x]
         y_limits = [center_y - half_range_y, center_y + half_range_y]
@@ -441,10 +458,6 @@ class ImageViewer(QtWidgets.QWidget):
                 # gets thrown if x, y, z are out of bounds of the image (this happens on the edges of the figure)
                 return
 
-    # def wheelEvent(self, e):
-    #     # TODO: change the pyqt handler to not be this class... maybe emit signal
-    #     self.interactor_style.on_mousewheel_event(e)
-
 
 class PixelInfoQLabel(QtWidgets.QLabel):
     def __init__(self, parent=None):
@@ -479,14 +492,20 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('button_release_event', self.handle_mouse_button_up)
         self.iv.canvas.mpl_connect('motion_notify_event', self.on_mouse_motion)
         self.iv.canvas.mpl_connect('scroll_event', self.on_mousewheel_event)
-        # self.iv.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.iv.canvas.mpl_connect('key_press_event', self.on_key_press)
 
-        self.current_mouse_position_in_figure = [None, None]
+        self.last_mouse_position_in_figure = [0, 0]
         self.window_level_start_position = None
         self.mouse_wheel_step_residual = 0  # accumulating mousewheel movements, if they dont add up to a whole step
 
-    # def on_key_press(self, event):
-    #     print(event.key)
+    def on_key_press(self, event):
+        print(event.key)
+        if event.key == 'x':
+            self.iv.change_orientation(SLICE_ORIENTATION['yz'])
+        elif event.key == 'y':
+            self.iv.change_orientation(SLICE_ORIENTATION['xz'])
+        elif event.key == 'z':
+            self.iv.change_orientation(SLICE_ORIENTATION['xy'])
 
     def handle_mouse_button_down(self, event):
         print(event.button)
@@ -503,10 +522,9 @@ class ImageViewerInteractor:
             self.on_right_button_up(event)
 
     def on_mouse_motion(self, event):
-        self.current_mouse_position_in_figure = [event.xdata, event.ydata]
-
         if event.xdata is not None and event.ydata is not None:
             # update mouse cursor position
+            self.last_mouse_position_in_figure = [event.xdata, event.ydata]
             position = [event.xdata, event.ydata]
             position.insert(self.iv.orientation, self.iv.current_slice)
             self.iv.show_pixel_info(position)
@@ -531,7 +549,7 @@ class ImageViewerInteractor:
             self.iv.set_window_level(new_window, new_level)
 
     def on_mousewheel_event(self, event):
-        steps = round(event.step)  # most mice send 120 units as a step (= 15 degrees)
+        steps = round(event.step)
 
         # in case of high resolution touchpads/mice: accumulate values under the step threshold
         if steps == 0:
@@ -540,23 +558,20 @@ class ImageViewerInteractor:
             steps += adjust
             self.mouse_wheel_step_residual = residual - adjust  # update the residual
 
-        print(event.step, steps)
-        print(event.key)
-
         if event.key == 'control':
             # if ctrl key is pressed while scrolling: zoom image
 
-            if any(coord is None for coord in self.current_mouse_position_in_figure):
-                # choos the figure center as zoom center if mouse outside of figure
-                center_x = (self.iv.ax.get_xlim()[1] - self.iv.ax.get_xlim()[0]) / 2
-                center_y = (self.iv.ax.get_ylim()[1] - self.iv.ax.get_ylim()[0]) / 2
+            if event.xdata is None or event.ydata is None:
+                # choose the figure center as zoom center if mouse outside of figure
+                center_x = self.last_mouse_position_in_figure[0]
+                center_y = self.last_mouse_position_in_figure[1]
             else:
                 center_x = event.xdata
                 center_y = event.ydata
 
             # zooming steps * 20 %
             new_zoom = self.iv.current_zoom + steps * 20
-            self.iv.zoom(center_x=center_x, center_y=center_y, percent=new_zoom)
+            self.iv.zoom(percent=new_zoom, center_x=center_x, center_y=center_y)
         else:
             # move slice by steps
             self.iv.move_slice(steps)
@@ -642,7 +657,7 @@ def add_mask_to_image(ax, mask, aspect, alpha=0.3, color='r'):
 
     cmap = ListedColormap([color])
     mask = np.ma.masked_where(mask == 0, mask)
-    plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha)  # todo: place origin of image and matrix in rcParams
+    plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha)
 
     return plot
 
