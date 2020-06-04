@@ -59,12 +59,12 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         exit_action.setStatusTip('Exit application')
         exit_action.triggered.connect(self.close)
 
-        open_action = QAction('&Replace Image', self)
+        open_action = QAction('&Open Other Image', self)
         open_action.setShortcut('Ctrl+O')
         open_action.setStatusTip('Replace the current image with another image from a file.')
         open_action.triggered.connect(self.load_image)
 
-        open_mask_action = QAction('&Load reference mask', self)
+        open_mask_action = QAction('Load reference &mask', self)
         open_mask_action.setShortcut('Ctrl+M')
         open_mask_action.setStatusTip('Load reference mask of the image')
         open_mask_action.triggered.connect(self.load_mask)
@@ -184,8 +184,8 @@ class ImageViewer(QtWidgets.QWidget):
         self.canvas = FigureCanvas(Figure(figsize=(5, 5), facecolor='white'))
         self.canvas.setParent(self)
         self.ax = self.canvas.figure.subplots()
-        # self.ax.axis('off')
-        # self.canvas.figure.subplots_adjust(0, 0, 1, 1)
+        self.ax.axis('off')
+        self.canvas.figure.subplots_adjust(0, 0, 1, 1)
 
         self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
 
@@ -194,7 +194,11 @@ class ImageViewer(QtWidgets.QWidget):
         self.slice_slider.valueChanged.connect(self.update_slice)
 
         # define a text field to display image coordinates
+        bottom_bar_layout = QtWidgets.QHBoxLayout()
+        self.zoom_label = QtWidgets.QLabel('{} %'.format(self.current_zoom))
         self.pixel_info_label = PixelInfoQLabel(parent=self)
+        bottom_bar_layout.addWidget(self.zoom_label)
+        bottom_bar_layout.addWidget(self.pixel_info_label)
 
         # layout the QtWidget
         main_layout = QtWidgets.QVBoxLayout()
@@ -202,8 +206,12 @@ class ImageViewer(QtWidgets.QWidget):
         image_with_slider_layout.addWidget(self.canvas)
         image_with_slider_layout.addWidget(self.slice_slider)
         main_layout.addLayout(image_with_slider_layout)
-        main_layout.addWidget(self.pixel_info_label)
+        main_layout.addLayout(bottom_bar_layout)
         self.setLayout(main_layout)
+
+        # set the focus to be on the canvas, so that keyevents get handled by mpl_connect
+        self.canvas.setFocusPolicy(QtCore.Qt.ClickFocus)
+        self.canvas.setFocus()
 
         self.init_image()
 
@@ -332,6 +340,8 @@ class ImageViewer(QtWidgets.QWidget):
         self.ax.set_xlim(*x_limits)
         self.ax.set_ylim(*y_limits)
 
+        self.zoom_label.setText('{} %'.format(percent))
+
         self.canvas.draw()
 
     def get_slice_range(self):
@@ -427,9 +437,9 @@ class ImageViewer(QtWidgets.QWidget):
                 # gets thrown if x, y, z are out of bounds of the image (this happens on the edges of the figure)
                 return
 
-    def wheelEvent(self, e):
-        # TODO: change the pyqt handler to not be this class... maybe emit signal
-        self.interactor_style.on_mousewheel_event(e)
+    # def wheelEvent(self, e):
+    #     # TODO: change the pyqt handler to not be this class... maybe emit signal
+    #     self.interactor_style.on_mousewheel_event(e)
 
 
 class PixelInfoQLabel(QtWidgets.QLabel):
@@ -464,10 +474,15 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('button_press_event', self.handle_mouse_button_down)
         self.iv.canvas.mpl_connect('button_release_event', self.handle_mouse_button_up)
         self.iv.canvas.mpl_connect('motion_notify_event', self.on_mouse_motion)
+        self.iv.canvas.mpl_connect('scroll_event', self.on_mousewheel_event)
+        # self.iv.canvas.mpl_connect('key_press_event', self.on_key_press)
 
         self.current_mouse_position_in_figure = [None, None]
         self.window_level_start_position = None
         self.mouse_wheel_step_residual = 0  # accumulating mousewheel movements, if they dont add up to a whole step
+
+    # def on_key_press(self, event):
+    #     print(event.key)
 
     def handle_mouse_button_down(self, event):
         print(event.button)
@@ -512,33 +527,28 @@ class ImageViewerInteractor:
             self.iv.set_window_level(new_window, new_level)
 
     def on_mousewheel_event(self, event):
-        # event is emitted in PyQt, not mpl
-        # TODO: scroll with ctrl -> zoom
-        if not event.pixelDelta().isNull():
-            y_scroll = event.pixelDelta().y()
-            steps = y_scroll
-        elif not event.angleDelta().isNull():
-            y_scroll = event.angleDelta().y()  # unit of angle delta is an eighth of a degree
+        steps = round(event.step)  # most mice send 120 units as a step (= 15 degrees)
 
-            steps = round(y_scroll / 120)  # most mice send 120 units as a step (= 15 degrees)
+        # in case of high resolution touchpads/mice: accumulate values under the step threshold
+        if steps == 0:
+            residual = event.step - steps + self.mouse_wheel_step_residual
+            adjust = copysign(floor(abs(residual)), residual)
+            steps += adjust
+            self.mouse_wheel_step_residual = residual - adjust  # update the residual
 
-            # in case of high resolution touchpads/mice: accumulate values under the step threshold
-            if steps == 0:
-                residual = (y_scroll / 120) - steps + self.mouse_wheel_step_residual
-                adjust = copysign(floor(abs(residual)), residual)
-                steps += adjust
-                self.mouse_wheel_step_residual = residual - adjust  # update the residual
-        else:
-            return
+        print(event.step, steps)
+        print(event.key)
 
-        if event.modifiers() == QtCore.Qt.ControlModifier:
+        if event.key == 'control':
+            # if ctrl key is pressed while scrolling: zoom image
+
             if any(coord is None for coord in self.current_mouse_position_in_figure):
                 # choos the figure center as zoom center if mouse outside of figure
                 center_x = (self.iv.ax.get_xlim()[1] - self.iv.ax.get_xlim()[0]) / 2
                 center_y = (self.iv.ax.get_ylim()[1] - self.iv.ax.get_ylim()[0]) / 2
             else:
-                center_x = self.current_mouse_position_in_figure[0]
-                center_y = self.current_mouse_position_in_figure[1]
+                center_x = event.xdata
+                center_y = event.ydata
 
             # zooming steps * 20 %
             new_zoom = self.iv.current_zoom + steps * 20
@@ -566,12 +576,6 @@ class ImageViewerInteractor:
 
     def on_right_button_up(self, event):
         self.window_level_start_position = None
-
-    # def on_mousewheel_forward(self, event):
-    #     self.iv.move_slice_forward()
-    #
-    # def on_mousewheel_backward(self, event):
-    #     self.iv.move_slice_backward()
 
 
 class ImageMask:
