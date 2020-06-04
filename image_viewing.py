@@ -17,7 +17,7 @@ def show_image_with_mask(image, mask, window_title):
 
 def show_and_return_markers(image, window_title):
     markers = _show_image(image, window_title, return_markers=True)
-    return markers  # TODO: markers have to be int for region growing
+    return markers
 
 
 def _show_image(image, window_title, blocking=True, mask=None, return_markers=False):
