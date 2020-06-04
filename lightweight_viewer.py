@@ -36,10 +36,10 @@ PARAMS = {
 
 
 class LightWeightViewer(QtWidgets.QMainWindow):
-    def __init__(self, image, title='IMI Image Viewer', mask=None, p_markers=None):
+    def __init__(self, image, title='IMI Image Viewer', mask=None):
         super(LightWeightViewer, self).__init__()
 
-        self.image_viewer = ImageViewer(image, parent=self, p_markers=p_markers)
+        self.image_viewer = ImageViewer(image, parent=self)
         if mask is not None:
             self.image_viewer.add_mask(mask)
 
@@ -48,6 +48,9 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         self.init_menu_bar()
         self.setWindowTitle(title)
         self.show()
+
+    def get_markers_for_region_growing(self):
+        return list(list(int(coord) for coord in m.pixel_position) for m in self.image_viewer.markers)
 
     def init_menu_bar(self):
         menubar = self.menuBar()
@@ -168,12 +171,12 @@ class LightWeightViewer(QtWidgets.QMainWindow):
 
 
 class ImageViewer(QtWidgets.QWidget):
-    def __init__(self, image_data: sitk.Image = None, parent=None, p_markers=None):
+    def __init__(self, image_data: sitk.Image = None, parent=None):
         super(ImageViewer, self).__init__(parent)
         self.viewportsize_x = 800
         self.viewportsize_y = 800
         self.masks = {}  # dict with mask as key and its plot as value
-        self.markers = p_markers if p_markers is not None else []
+        self.markers = []
         self.orientation = SLICE_ORIENTATION_XY
 
         if image_data is None:
