@@ -6,10 +6,11 @@ assert len(sys.argv) > 1, 'No input image specified'
 
 # load example image from argv
 input_image = sitk.ReadImage(sys.argv[1])
+vis.show_image(input_image, 'Input Image', blocking=False)
 
 # pre-processing
-smoothed = sitk.DiscreteGaussian(input_image, 0.5)
-vis.show_image(smoothed, 'Smoothed Image')
+smoothed = sitk.DiscreteGaussian(input_image, 2)
+vis.show_image(smoothed, 'Smoothed Image', blocking=False)
 
 # get seedpoints
 seeds = vis.show_and_return_markers(smoothed, 'Set Seedpoints')

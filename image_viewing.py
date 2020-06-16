@@ -5,31 +5,55 @@ import SimpleITK as sitk
 import sys
 
 
+viewer_queue = []
+
+
 def show_image(image, window_title, blocking=True):
-    exec_code = _show_image(image, window_title)
+    exec_code = _show_image(image, window_title, blocking=blocking)
     return exec_code
 
 
-def show_image_with_mask(image, mask, window_title):
-    exec_code = _show_image(image, window_title, mask=mask)
+def show_image_with_mask(image, mask, window_title, blocking=True):
+    exec_code = _show_image(image, window_title, mask=mask, blocking=blocking)
     return exec_code
 
 
 def show_and_return_markers(image, window_title):
-    markers = _show_image(image, window_title, return_markers=True)
+    # blocking should always be true in this application
+    markers = _show_image(image, window_title, return_markers=True, blocking=True)
     return markers
 
 
 def _show_image(image, window_title, blocking=True, mask=None, return_markers=False):
-    app = QApplication(sys.argv)
-    w = LightWeightViewer(image, window_title, mask=mask)
-    exec_code = app.exec_()
-    # TODO: non blocking viewers!
+    # get the active Qt application or create a new one
+    if QApplication.instance() is not None:
+        app = QApplication.instance()
+    else:
+        app = QApplication(sys.argv)
+
+    # construct the new viewer with the input image
+    widget = LightWeightViewer(image, window_title, mask=mask)
+    viewer_queue.append(widget)
+
+    if blocking:
+        # start app and show all previously invisible viewers
+        for v in viewer_queue:
+            v.show()
+        exec_code = app.exec_()  # start the Qt event loop (blocking all further execution)
+
+        # remove the viewers already shown
+        viewer_queue.clear()
+    else:
+        # nothing wrong because no execution of event loop
+        exec_code = 0
+
     if mask is not None:
-        w.image_viewer.add_mask(mask)
+        # add the mask to the new viewer
+        widget.image_viewer.add_mask(mask)
 
     if return_markers:
-        return w.get_markers_for_region_growing()
+        # get the user input of the new viewer
+        return widget.get_markers_for_region_growing()
     else:
         return exec_code
 
