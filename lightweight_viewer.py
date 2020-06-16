@@ -4,7 +4,7 @@ from time import time
 import SimpleITK as sitk
 import numpy as np
 from PyQt5.QtWidgets import QAction
-# from PyQt5 import QtWidgets
+import os
 
 import matplotlib as mpl
 from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
@@ -134,10 +134,10 @@ class LightWeightViewer(QtWidgets.QMainWindow):
     def file_dialog(self, caption, filter, save=False):
         if save:
             file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption=caption,
-                                                                 directory='/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages',
+                                                                 directory=os.getcwd(),
                                                                  filter=filter)
         else:
-            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption=caption, directory='/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages', filter=filter)
+            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption=caption, directory=os.getcwd(), filter=filter)
         return file_path
 
     def load_image(self):
