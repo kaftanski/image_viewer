@@ -5,7 +5,7 @@ from matplotlib.figure import Figure
 import numpy as np
 import itk
 
-from mpl_interactive_view import show_in_interactive_figure
+from old.mpl_interactive_view import show_in_interactive_figure
 
 
 class Window(QMainWindow):

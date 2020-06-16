@@ -2,7 +2,7 @@ import sys
 
 from PyQt5 import QtWidgets
 
-from project_ui_prototype import ProjectMainWindow
+from old.project_ui_prototype import ProjectMainWindow
 
 
 # def except_hook(cls, exception, traceback):
