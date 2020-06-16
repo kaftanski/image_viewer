@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QApplication
 
-from lightweight_viewer import LightWeightViewer
+from lightweight_viewer import LightWeightViewer, ImageMask
 import SimpleITK as sitk
 import sys
 
@@ -13,8 +13,9 @@ def show_image(image, window_title, blocking=True):
     return exec_code
 
 
-def show_image_with_mask(image, mask, window_title, blocking=True):
-    exec_code = _show_image(image, window_title, mask=mask, blocking=blocking)
+def show_image_with_mask(image, mask, window_title, color='b', blocking=True):
+    im = ImageMask(mask, color=color)
+    exec_code = _show_image(image, window_title, mask=im, blocking=blocking)
     return exec_code
 
 
@@ -46,10 +47,6 @@ def _show_image(image, window_title, blocking=True, mask=None, return_markers=Fa
     else:
         # nothing wrong because no execution of event loop
         exec_code = 0
-
-    if mask is not None:
-        # add the mask to the new viewer
-        widget.image_viewer.add_mask(mask)
 
     if return_markers:
         # get the user input of the new viewer

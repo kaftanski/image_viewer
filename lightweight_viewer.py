@@ -132,7 +132,6 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             self.image_viewer.zoom(percent=new_zoom_factor)
 
     def file_dialog(self, caption, filter, save=False):
-        # todo: change standard directory to cwd (maybe something else)
         if save:
             file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption=caption,
                                                                  directory='/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages',
@@ -157,7 +156,8 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             print('Loading mask ' + file_path)
 
             image = sitk.ReadImage(file_path)
-            self.image_viewer.add_mask(image, color='r')
+            mask = ImageMask(image, color='r')
+            self.image_viewer.add_mask(mask)
 
     def save_current_view(self):
         file_path = self.file_dialog('Save File', 'Image (*.png, *.PNG)', save=True)
@@ -322,7 +322,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.pixel_info_label.set_coordinate(self.orientation, new_slice)
         self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
 
-        # reset zoom factor. TODO: keep zoom?
+        # reset zoom factor
         self.zoom_label.setText('100 %')
         self.current_zoom = 100
 
@@ -412,13 +412,13 @@ class ImageViewer(QtWidgets.QWidget):
             self.marker_plot.remove()
             self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
 
-    def add_mask(self, binary_image, color='b'):
-        # TODO assert spacing and dimensions etc equal
-        #assert vtk_binary_image.GetExtent() == self.vtk_image_viewer.GetInput().GetExtent()
+    def add_mask(self, mask):
+        if not compatible_metadata(self.image, mask.itk_mask):
+            return
 
-        new_mask = ImageMask(binary_image, 0.3, color)
-        self.masks[new_mask] = None
+        self.masks[mask] = None
         self.update_masks()
+        self.canvas.draw()
 
     def update_masks(self):
         self.clear_masks()
@@ -635,6 +635,34 @@ def get_aspect_ratio_for_plane(spacing, orientation, image_dimensions):
     dims = list(d for d in range(3) if d != orientation)
     ratio = spacing[dims[1]] * image_dimensions[1] / (spacing[dims[0]] * image_dimensions[0])
     return ratio
+
+
+def compatible_metadata(image1: sitk.Image, image2: sitk.Image, check_size=True, check_spacing=True, check_origin=True):
+    all_parameters_equal = True
+    tolerance = 1e-4
+
+    if check_size:
+        size1 = image1.GetSize()
+        size2 = image2.GetSize()
+        if size1 != size2:
+            all_parameters_equal = False
+            print(f'Images do not have the same size ({size1} != {size2})')
+
+    if check_spacing:
+        spacing1 = image1.GetSpacing()
+        spacing2 = image2.GetSpacing()
+        if any(list(abs(s1-s2) > tolerance for s1, s2 in zip(spacing1, spacing2))):
+            all_parameters_equal = False
+            print(f'Images do not have the same spacing ({spacing1} != {spacing2})')
+
+    if check_origin:
+        origin1 = image1.GetOrigin()
+        origin2 = image2.GetOrigin()
+        if any(list(abs(o1-o2) > tolerance for o1, o2 in zip(origin1, origin2))):
+            all_parameters_equal = False
+            print(f'Images do not have the same origin ({origin1} != {origin2})')
+
+    return all_parameters_equal
 
 
 def index_compatibility(index):

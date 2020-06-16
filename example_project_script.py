@@ -20,4 +20,4 @@ print(seeds)
 binary_segmentation = sitk.ConnectedThreshold(smoothed, seeds, lower=650, upper=1000)
 
 # visualize result
-vis.show_image_with_mask(input_image, binary_segmentation, 'Result')
+vis.show_image_with_mask(input_image, binary_segmentation, 'Result', color='g')
