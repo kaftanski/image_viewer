@@ -23,7 +23,14 @@ SLICE_ORIENTATION = {'xy': 2, 'xz': 1, 'yz': 0}
 
 
 class LightWeightViewer(QtWidgets.QMainWindow):
+    """ A PyQt window with matplotlib-based viewer of a given image """
     def __init__(self, image, title='IMI Image Viewer', mask=None):
+        """ Constructor with intitial image to be shown
+
+        @param sitk.Image image: SimpleITK Image to be shown
+        @param str title: optionally specify window title
+        @param mask: optional initial mask to be shown over the image
+        """
         super(LightWeightViewer, self).__init__()
 
         self.image_viewer = ImageViewer(image, parent=self)
@@ -37,9 +44,15 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         self.show()
 
     def get_markers_for_region_growing(self):
+        """ Get the user input markers in a list of lists of pixel coordinates
+
+        @return List[List[int]]: the coordinates of the markers in image coordinates
+        """
         return list(list(int(coord) for coord in m.pixel_position) for m in self.image_viewer.markers)
 
     def init_menu_bar(self):
+        """ Creates and populates the PyQt menuBar with viewer control actions
+        """
         menubar = self.menuBar()
 
         file_menu = menubar.addMenu('&File')
@@ -105,22 +118,37 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         view_menu.addActions([zoom_action, reset_wl_action])
 
     def zoom_dialog(self):
+        """ Opens an input dialog for a desired zoom factor and zooms the image
+        """
         new_zoom_factor, ok = QtWidgets.QInputDialog.getInt(self, 'Zoom', 'Percentage:', min=100, step=20,
                                                         value=self.image_viewer.current_zoom)
         if ok:
             self.image_viewer.zoom(percent=new_zoom_factor)
 
-    def file_dialog(self, caption, filter, save=False):
-        if save:
+    def file_dialog(self, caption, filter, mode='save'):
+        """ Shows an open or save file dialog and returns the picked path as a string
+
+        @param str caption: the string to be displayed as window title
+        @param str filter: the file filter prompt (i.e. the file extension, type etc.)
+        @param str mode: either 'save' or 'open'; determines if an open- or save-file-dialog is shown
+        @return str: the user's chosen file path
+        """
+        if mode == 'save':
             file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption=caption,
                                                                  directory=os.getcwd(),
                                                                  filter=filter)
-        else:
+        elif mode == 'open':
             file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption=caption, directory=os.getcwd(), filter=filter)
+        else:
+            raise ValueError('\'{}\' is not a valid mode for file_dialog. Choose \'save\' or \'open\' instead.'.format(mode))
+
         return file_path
 
     def load_image(self):
-        file_path = self.file_dialog(caption='Load Image', filter='Image (*.nii.gz)', save=False)
+        """ Choose a file to open and set it as the new image of the viewer.
+        Currently only nifti images are suggested but all image types that ITK can read should work.
+        """
+        file_path = self.file_dialog(caption='Load Image', filter='Image (*.nii.gz)', mode='open')
 
         if file_path != '':
             print('Loading image ' + file_path)
@@ -129,7 +157,13 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             self.image_viewer.set_image(image)
 
     def load_mask(self):
-        file_path = self.file_dialog(caption='Load Image Mask', filter='Image (*.nii.gz)', save=False)
+        """ Choose a file to open and set it as the red mask over the image.
+        Currently only nifti images are suggested but all image types that ITK can read should work.
+
+        It is possible to load any image as mask, because all voxels != 0 are interpreted as object and all
+        0-value voxels will be background.
+        """
+        file_path = self.file_dialog(caption='Load Image Mask', filter='Image (*.nii.gz)', mode='open')
 
         if file_path != '':
             print('Loading mask ' + file_path)
@@ -139,7 +173,9 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             self.image_viewer.add_mask(mask)
 
     def save_current_view(self):
-        file_path = self.file_dialog('Save File', 'Image (*.png, *.PNG)', save=True)
+        """ Choose a file to save the current view of the viewer canvas as a .png file.
+        """
+        file_path = self.file_dialog('Save File', 'Image (*.png, *.PNG)', mode='save')
 
         if file_path != '':
             if file_path[-4:].lower() != '.png':
@@ -150,16 +186,22 @@ class LightWeightViewer(QtWidgets.QMainWindow):
 
 
 class ImageViewer(QtWidgets.QWidget):
-    def __init__(self, image_data: sitk.Image = None, parent=None):
+    """ PyQt Widget holding a matplotlib canvas to visualize and navigate through 3D image data
+    """
+    def __init__(self, image_data=None, parent=None):
+        """ Constructs the viewer and initializes all controls.
+
+        @param sitk.Image image_data: the SimpleITK image to visualize
+        @param parent: the widget's parent if used in a full PyQt GUI
+        """
         super(ImageViewer, self).__init__(parent)
-        self.viewportsize_x = 800
-        self.viewportsize_y = 800
+
         self.masks = {}  # dict with mask as key and its plot as value
         self.markers = []
         self.orientation = SLICE_ORIENTATION_XY
 
         if image_data is None:
-            # load example image
+            # load example image TODO: remove this
             image_data = sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
 
         self.image = image_data
@@ -175,13 +217,19 @@ class ImageViewer(QtWidgets.QWidget):
         self.current_zoom = 100
 
         # init the MPL canvas
-        self.canvas = FigureCanvas(Figure(figsize=(5, 5), facecolor='white'))
-        self.canvas.setParent(self)
+        initial_canvas_size_x = 5  # size in pixels. corresponds to a size of 5x5 inches with 100 dpi
+        initial_canvas_size_y = 5
+        self.max_resolution = 500
+        self.dpi = self.max_resolution // initial_canvas_size_x
+
+        self.canvas = FigureCanvas(Figure(figsize=(initial_canvas_size_x, initial_canvas_size_y), dpi=self.dpi, facecolor='white'))
         self.ax = self.canvas.figure.subplots()
         self.ax.axis('off')
         self.canvas.figure.subplots_adjust(0, 0, 1, 1)
 
         self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
+
+        self.canvas.setParent(self)
 
         # define a slider for image slicing
         self.slice_slider = QtWidgets.QSlider(orientation=QtCore.Qt.Vertical, parent=self)
@@ -249,7 +297,7 @@ class ImageViewer(QtWidgets.QWidget):
             return
 
         self.orientation = orientation
-        self.update_slice(self.current_slice)
+        self.redraw_slice()
         self.update_slider()
 
     def set_window_level(self, window, level):
@@ -273,14 +321,16 @@ class ImageViewer(QtWidgets.QWidget):
         self.set_window_level(window, level)
 
     def update_slice(self, new_slice):
-        # todo: Blitting
         lower, upper = self.get_slice_range()
         if not lower <= new_slice < upper:
             new_slice = lower if new_slice < lower else upper - 1
 
         self.current_slice = new_slice
+        self.redraw_slice()
 
-        img_slice = self.image_array[index_compatibility(get_3d_plane_index(slice_index=new_slice, orientation=self.orientation))]
+    def redraw_slice(self):
+        # todo: Blitting
+        img_slice = self.image_array[index_compatibility(get_3d_plane_index(slice_index=self.current_slice, orientation=self.orientation))]
 
         # set extent to be according to dimensions so that nothing gets squished
         y_max, x_max = img_slice.shape
@@ -295,7 +345,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.im_plot = self.ax.imshow(img_slice, vmin=self.current_level - half_window, vmax=self.current_level + half_window,
                                       aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()))
 
-        self.pixel_info_label.set_coordinate(self.orientation, new_slice)
+        self.pixel_info_label.set_coordinate(self.orientation, self.current_slice)
         self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
 
         # reset zoom factor
@@ -472,6 +522,7 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('motion_notify_event', self.on_mouse_motion)
         self.iv.canvas.mpl_connect('scroll_event', self.on_mousewheel_event)
         self.iv.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.iv.canvas.mpl_connect('resize_event', self.on_resize)
 
         self.last_mouse_position_in_figure = [0, 0]
         self.window_level_start_position = None
@@ -578,6 +629,17 @@ class ImageViewerInteractor:
 
     def on_right_button_up(self, event):
         self.window_level_start_position = None
+
+    def on_resize(self, event):
+        size_inches = self.iv.canvas.figure.get_size_inches()
+        new_dpi = self.iv.max_resolution // min(size_inches)
+        print(size_inches, new_dpi)
+        # TODO
+        # self.iv.canvas.figure.set_dpi(new_dpi)
+        # self.iv.canvas.figure.set_size_inches(size_inches)
+        # self.iv.canvas.draw()
+        # self.iv.dpi = new_dpi
+        # self.iv.redraw_slice()
 
 
 class ImageMask:
