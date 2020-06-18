@@ -1,17 +1,15 @@
+import os
 from math import floor, copysign
-from time import time
 
 import SimpleITK as sitk
+import matplotlib as mpl
 import numpy as np
 from PyQt5.QtWidgets import QAction
-import os
-
-import matplotlib as mpl
-from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
+from matplotlib.backend_bases import MouseButton
+from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
-from matplotlib.backend_bases import MouseButton
 
 mpl.rcParams['image.origin'] = 'lower'
 mpl.rcParams['image.cmap'] = 'gray'
@@ -22,17 +20,6 @@ SLICE_ORIENTATION_XZ = 1
 SLICE_ORIENTATION_YZ = 0
 
 SLICE_ORIENTATION = {'xy': 2, 'xz': 1, 'yz': 0}
-
-COLORS = {
-    'red': [1, 0, 0],
-    'green': [0, 1, 0],
-    'blue': [0, 0, 1]
-}
-
-
-PARAMS = {
-    'marker_radius': 3
-}
 
 
 class LightWeightViewer(QtWidgets.QMainWindow):
@@ -116,14 +103,6 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         reset_wl_action.triggered.connect(self.image_viewer.reset_window_level)
 
         view_menu.addActions([zoom_action, reset_wl_action])
-
-    # def keyPressEvent(self, e):
-    #     if e.text() == 'x':
-    #         self.image_viewer.change_orientation(SLICE_ORIENTATION['yz'])
-    #     elif e.text() == 'y':
-    #         self.image_viewer.change_orientation(SLICE_ORIENTATION['xz'])
-    #     elif e.text() == 'z':
-    #         self.image_viewer.change_orientation(SLICE_ORIENTATION['xy'])
 
     def zoom_dialog(self):
         new_zoom_factor, ok = QtWidgets.QInputDialog.getInt(self, 'Zoom', 'Percentage:', min=100, step=20,
@@ -233,9 +212,6 @@ class ImageViewer(QtWidgets.QWidget):
         self.interactor_style = ImageViewerInteractor(self)
 
         self.show()
-
-        # self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
-        # self.add_mask(sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/02/VSD.Brain.02.O.OT_reg.nii.gz'), color='g')
 
     def init_image(self):
         # DON'T swap axes, in order to keep the fastest dimension of the np array the first
@@ -410,7 +386,7 @@ class ImageViewer(QtWidgets.QWidget):
             self.marker_plot.set_offsets(np_markers.swapaxes(0, 1))
         else:
             self.marker_plot.remove()
-            self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
+            self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR, s=ImageMarker.STANDARD_SIZE)
 
     def add_mask(self, mask):
         if not compatible_metadata(self.image, mask.itk_mask):
@@ -503,7 +479,11 @@ class ImageViewerInteractor:
 
     def on_key_press(self, event):
         print(event.key)
-        if event.key == 'x':
+        if event.key == 'up':
+            self.iv.move_slice(1)
+        elif event.key == 'down':
+            self.iv.move_slice(-1)
+        elif event.key == 'x':
             self.iv.change_orientation(SLICE_ORIENTATION['yz'])
         elif event.key == 'y':
             self.iv.change_orientation(SLICE_ORIENTATION['xz'])
@@ -615,7 +595,8 @@ class ImageMask:
 
 
 class ImageMarker:
-    STANDARD_COLOR = 'b'
+    STANDARD_COLOR = 'b'  # follows matplotlib colors definitions
+    STANDARD_SIZE = 10  # size of markers in pt
 
     def __init__(self, pixel_position):
         assert len(pixel_position) == 3

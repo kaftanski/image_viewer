@@ -1,9 +1,8 @@
+import sys
+
 from PyQt5.QtWidgets import QApplication
 
 from lightweight_viewer import LightWeightViewer, ImageMask
-import SimpleITK as sitk
-import sys
-
 
 viewer_queue = []
 
@@ -13,8 +12,8 @@ def show_image(image, window_title, blocking=True):
     return exec_code
 
 
-def show_image_with_mask(image, mask, window_title, color='b', blocking=True):
-    im = ImageMask(mask, color=color)
+def show_image_with_mask(image, mask_image, window_title, color='b', blocking=True):
+    im = ImageMask(mask_image, color=color)
     exec_code = _show_image(image, window_title, mask=im, blocking=blocking)
     return exec_code
 
