@@ -556,7 +556,8 @@ class ImageViewerInteractor:
             self.on_right_button_up(event)
 
     def on_mouse_motion(self, event):
-        if event.xdata is not None and event.ydata is not None:
+        # print('hello {}, {}'.format(event.x, event.y))
+        if event.inaxes:
             # update mouse cursor position
             self.last_mouse_position_in_figure = [event.xdata, event.ydata]
             position = [event.xdata, event.ydata]
@@ -595,7 +596,7 @@ class ImageViewerInteractor:
         if event.key == 'control':
             # if ctrl key is pressed while scrolling: zoom image
 
-            if event.xdata is None or event.ydata is None:
+            if not event.inaxes:
                 # choose the figure center as zoom center if mouse outside of figure
                 center_x = self.last_mouse_position_in_figure[0]
                 center_y = self.last_mouse_position_in_figure[1]
@@ -613,7 +614,7 @@ class ImageViewerInteractor:
             self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
 
     def on_left_button_down(self, event):
-        if event.xdata is not None and event.ydata is not None:
+        if event.inaxes:
             # click inside of figure
             event_data_position = [event.xdata, event.ydata]
             event_data_position.insert(self.iv.orientation, self.iv.current_slice)
