@@ -621,34 +621,63 @@ class ImageViewer(QtWidgets.QWidget):
 
 
 class PixelInfoQLabel(QtWidgets.QLabel):
-    def __init__(self, parent=None):
+    """ Label to show image coordinates and intensity """
+    def __init__(self, parent: QtWidgets.QWidget = None):
+        """ Initialises the label (with coords=[0,0,0])
+
+        @param parent: the QWidget this element belongs to
+        """
         super(PixelInfoQLabel, self).__init__(text='', parent=parent)
 
         self.coords = [0, 0, 0]
         self.intensity = 0
 
-    def set_values(self, x, y, z, intensity):
+    def set_values(self, x: Union[float, int], y: Union[float, int], z: Union[float, int], intensity: Union[float, int]):
+        """ Updates the label text with given coordinates and intensity
+
+        @param x: x coordinate
+        @param y: y coordinate
+        @param z: z coordinate
+        @param intensity: the image intensity
+        """
         self.coords = [x, y, z]
         self.intensity = intensity
 
         self.update_text()
 
     def set_coordinate(self, dim, coord):
+        """ Set a single coordinate in the given dimension
+
+        @param dim: the dimension the coord belongs to
+        @param coord: the index to set
+        """
         self.coords[dim] = coord
         self.update_text()
 
     def set_intensity(self, intensity):
+        """ Set the intensity text
+
+        @param intensity: the intensity value to set
+        """
         self.intensity = intensity
         self.update_text()
 
     def update_text(self):
+        """ Sets the label text according to this object's attributes
+        """
         self.setText('({}, {}, {}): {}'.format(*self.coords, self.intensity))
 
 
 class ImageViewerInteractor:
+    """ Handler for all user inputs on the given ImageViewer """
     def __init__(self, image_viewer: ImageViewer):
+        """ Init all connections to events, the mpl canvas can produce
+
+        @param image_viewer: the image viewer to observe
+        """
         self.iv = image_viewer
 
+        # event observing
         self.iv.canvas.mpl_connect('button_press_event', self.handle_mouse_button_down)
         self.iv.canvas.mpl_connect('button_release_event', self.handle_mouse_button_up)
         self.iv.canvas.mpl_connect('motion_notify_event', self.on_mouse_motion)
@@ -657,10 +686,22 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('resize_event', self.on_resize)
 
         self.last_mouse_position_in_figure = [0, 0]
-        self.window_level_start_position = None
+        self.window_level_start_position = None  # set on right mouse down in order to determine the new w/l
         self.mouse_wheel_step_residual = 0  # accumulating mousewheel movements, if they dont add up to a whole step
 
     def on_key_press(self, event):
+        """ Handles all keys pressed by the user.
+        Key -> Functionality:
+            up -> move slice forward by 1
+            down -> move slice backward by 1
+            x -> change orientation to yz plane
+            y -> change orientation to xz plane
+            z -> change orientation to xy plane
+            pageup -> make a page up step through slices (+ 10 by default)
+            pagedown -> make a page down step through slices (- 10 by default)
+
+        @param event: the mpl.backend_bases.KeyEvent to handle
+        """
         print(event.key)
         if event.key == 'up':
             self.iv.move_slice(1)
@@ -680,6 +721,11 @@ class ImageViewerInteractor:
             self.iv.move_slice(- self.iv.slice_slider.pageStep())
 
     def handle_mouse_button_down(self, event):
+        """ Handles mouse button down events by distributing event to
+        self.on_left_button_down or self.on_right_button_down respectively.
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
         print(event.button)
         if event.button == MouseButton.LEFT:
             self.on_left_button_down(event)
@@ -687,14 +733,65 @@ class ImageViewerInteractor:
             self.on_right_button_down(event)
 
     def handle_mouse_button_up(self, event):
+        """ Handles mouse button up events by distributing event to
+        self.on_left_button_up or self.on_right_button_up respectively.
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
         print(event.button, 'up')
         if event.button == MouseButton.LEFT:
             self.on_left_button_up(event)
         elif event.button == MouseButton.RIGHT:
             self.on_right_button_up(event)
 
+    def on_left_button_down(self, event):
+        """ Left mouse button down event handler:
+             if click was inside the figure, a marker is placed at the mouse position
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
+        if event.inaxes:
+            # click inside of figure
+            event_data_position = [event.xdata, event.ydata]
+            event_data_position.insert(self.iv.orientation, self.iv.current_slice)
+            print('adding marker at {}'.format(event_data_position))
+            self.iv.add_marker(event_data_position)
+
+    def on_left_button_up(self, event):
+        """ Left mouse button up event handler:
+             no functionality.
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
+        pass
+
+    def on_right_button_down(self, event):
+        """ Left mouse button down event handler:
+             starts the window levelling.
+             Moving the mouse while the right mouse button is pressed does window levelling.
+             Movement in x-direction modifies the window, y-direction for level.
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
+        # start window levelling
+        self.window_level_start_position = [event.x, event.y]
+
+    def on_right_button_up(self, event):
+        """ Left mouse button down event handler:
+             end of window levelling
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
+        self.window_level_start_position = None
+
     def on_mouse_motion(self, event):
-        # print('hello {}, {}'.format(event.x, event.y))
+        """ Handles mouse movement events:
+             if mouse is over the image, the coordinates and intensity under the cursor are displayed.
+             if right mouse button is pressed, window/levelling is carried out
+             (see ImageViewerInteractor.on_right_button_down for details)
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
         if event.inaxes:
             # update mouse cursor position
             self.last_mouse_position_in_figure = [event.xdata, event.ydata]
@@ -722,6 +819,12 @@ class ImageViewerInteractor:
             self.iv.set_window_level(new_window, new_level)
 
     def on_mousewheel_event(self, event):
+        """ Handles mouse scrolling events:
+             scrolling up moves slice forward, scrolling down moves slice backward.
+             scrolling with ctrl key pressed zooms in or out with the cursor position as zoom center.
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
         steps = round(event.step)
 
         # in case of high resolution touchpads/mice: accumulate values under the step threshold
@@ -742,34 +845,23 @@ class ImageViewerInteractor:
                 center_x = event.xdata
                 center_y = event.ydata
 
-            # zooming steps * 20 %
+            # one step corresponds to 20 % zoom
             new_zoom = self.iv.current_zoom + steps * 20
             self.iv.zoom(percent=new_zoom, center_x=center_x, center_y=center_y)
         else:
             # move slice by steps
             self.iv.move_slice(steps)
+
+            # update the coordinate label to show the new slice
             self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
             self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
 
-    def on_left_button_down(self, event):
-        if event.inaxes:
-            # click inside of figure
-            event_data_position = [event.xdata, event.ydata]
-            event_data_position.insert(self.iv.orientation, self.iv.current_slice)
-            print('adding marker at {}'.format(event_data_position))
-            self.iv.add_marker(event_data_position)
-
-    def on_left_button_up(self, event):
-        pass
-
-    def on_right_button_down(self, event):
-        # start window levelling
-        self.window_level_start_position = [event.x, event.y]
-
-    def on_right_button_up(self, event):
-        self.window_level_start_position = None
-
     def on_resize(self, event):
+        """ *TODO* Changes the dpi of the figure, so that the resolution does not change.
+        Aims to increase performance on large window sizes.
+
+        @param event: the mpl.backend_bases.ResizeEvent to handle
+        """
         size_inches = self.iv.canvas.figure.get_size_inches()
         new_dpi = self.iv.max_resolution // min(size_inches)
         print(size_inches, new_dpi)
