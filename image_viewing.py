@@ -2,7 +2,8 @@ import sys
 
 from PyQt5.QtWidgets import QApplication
 
-from lightweight_viewer import LightWeightViewer, ImageMask
+from lightweight_viewer import LightWeightViewer
+from image_classes import ImageMask
 
 viewer_queue = []
 

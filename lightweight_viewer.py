@@ -1,5 +1,6 @@
 import os
 from math import floor, copysign
+from typing import Union, List, Sequence
 
 import SimpleITK as sitk
 import matplotlib as mpl
@@ -8,8 +9,11 @@ from PyQt5.QtWidgets import QAction
 from matplotlib.backend_bases import MouseButton
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
-from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
+
+from image_classes import ImageMask, ImageMarker
+from image_utils import get_3d_plane_index, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
+    add_mask_to_image
 
 mpl.rcParams['image.origin'] = 'lower'
 mpl.rcParams['image.cmap'] = 'gray'
@@ -24,11 +28,11 @@ SLICE_ORIENTATION = {'xy': 2, 'xz': 1, 'yz': 0}
 
 class LightWeightViewer(QtWidgets.QMainWindow):
     """ A PyQt window with matplotlib-based viewer of a given image """
-    def __init__(self, image, title='IMI Image Viewer', mask=None):
+    def __init__(self, image: sitk.Image, title: str = 'IMI Image Viewer', mask: ImageMask = None):
         """ Constructor with intitial image to be shown
 
-        @param sitk.Image image: SimpleITK Image to be shown
-        @param str title: optionally specify window title
+        @param image: SimpleITK Image to be shown
+        @param title: optionally specify window title
         @param mask: optional initial mask to be shown over the image
         """
         super(LightWeightViewer, self).__init__()
@@ -43,10 +47,10 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         self.setWindowTitle(title)
         self.show()
 
-    def get_markers_for_region_growing(self):
+    def get_markers_for_region_growing(self) -> List[List[int]]:
         """ Get the user input markers in a list of lists of pixel coordinates
 
-        @return List[List[int]]: the coordinates of the markers in image coordinates
+        @return: the coordinates of the markers in image coordinates
         """
         return list(list(int(coord) for coord in m.pixel_position) for m in self.image_viewer.markers)
 
@@ -125,22 +129,24 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         if ok:
             self.image_viewer.zoom(percent=new_zoom_factor)
 
-    def file_dialog(self, caption, filter, mode='save'):
+    def file_dialog(self, caption: str, filter_prompt: str, mode: str = 'save') -> str:
         """ Shows an open or save file dialog and returns the picked path as a string
 
-        @param str caption: the string to be displayed as window title
-        @param str filter: the file filter prompt (i.e. the file extension, type etc.)
-        @param str mode: either 'save' or 'open'; determines if an open- or save-file-dialog is shown
-        @return str: the user's chosen file path
+        @param caption: the string to be displayed as window title
+        @param filter_prompt: the file filter prompt (i.e. the file extension, type etc.)
+        @param mode: either 'save' or 'open'; determines if an open- or save-file-dialog is shown
+        @return the user's chosen file path
         """
         if mode == 'save':
             file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption=caption,
                                                                  directory=os.getcwd(),
-                                                                 filter=filter)
+                                                                 filter=filter_prompt)
         elif mode == 'open':
-            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption=caption, directory=os.getcwd(), filter=filter)
+            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption=caption, directory=os.getcwd(),
+                                                                 filter=filter_prompt)
         else:
-            raise ValueError('\'{}\' is not a valid mode for file_dialog. Choose \'save\' or \'open\' instead.'.format(mode))
+            raise ValueError(
+                '\'{}\' is not a valid mode for file_dialog. Choose \'save\' or \'open\' instead.'.format(mode))
 
         return file_path
 
@@ -148,7 +154,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         """ Choose a file to open and set it as the new image of the viewer.
         Currently only nifti images are suggested but all image types that ITK can read should work.
         """
-        file_path = self.file_dialog(caption='Load Image', filter='Image (*.nii.gz)', mode='open')
+        file_path = self.file_dialog(caption='Load Image', filter_prompt='Image (*.nii.gz)', mode='open')
 
         if file_path != '':
             print('Loading image ' + file_path)
@@ -163,7 +169,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         It is possible to load any image as mask, because all voxels != 0 are interpreted as object and all
         0-value voxels will be background.
         """
-        file_path = self.file_dialog(caption='Load Image Mask', filter='Image (*.nii.gz)', mode='open')
+        file_path = self.file_dialog(caption='Load Image Mask', filter_prompt='Image (*.nii.gz)', mode='open')
 
         if file_path != '':
             print('Loading mask ' + file_path)
@@ -188,27 +194,26 @@ class LightWeightViewer(QtWidgets.QMainWindow):
 class ImageViewer(QtWidgets.QWidget):
     """ PyQt Widget holding a matplotlib canvas to visualize and navigate through 3D image data
     """
-    def __init__(self, image_data=None, parent=None):
+    def __init__(self, image_data: sitk.Image = None, parent: QtWidgets.QWidget = None):
         """ Constructs the viewer and initializes all controls.
 
-        @param sitk.Image image_data: the SimpleITK image to visualize
-        @param parent: the widget's parent if used in a full PyQt GUI
+        @param image_data: the SimpleITK image to visualize
+        @param QtWidgets.QWidget parent: the widget's parent if used in a full PyQt GUI
         """
         super(ImageViewer, self).__init__(parent)
-
-        self.masks = {}  # dict with mask as key and its plot as value
-        self.markers = []
-        self.orientation = SLICE_ORIENTATION_XY
-
         if image_data is None:
+            # # create an empty 3d image
+            # image_data = sitk.GetImageFromArray(np.zeros((1, 1, 1)))
             # load example image TODO: remove this
-            image_data = sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
+            image_data = sitk.ReadImage(
+                '/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
 
-        self.image = image_data
-        self.image_array = None
+        # init attributes
+        self.image = image_data  # the SimpleITK image in the viewer
+        self.image_array = None  # the image as np.array
         self.current_slice = 0
 
-        self.im_plot = None
+        self.im_plot = None  # storing the mpl plot
 
         self.current_window = 0
         self.current_level = 0
@@ -216,13 +221,19 @@ class ImageViewer(QtWidgets.QWidget):
         self.greyval_range = [0, 0]
         self.current_zoom = 100
 
+        self.masks = {}  # dict with mask as key and its plot as value
+        self.markers = []  # list of markers and their pixel coordinates
+        self.orientation = SLICE_ORIENTATION_XY  # what dimensions are seen as the plane (values like in VTK)
+
         # init the MPL canvas
         initial_canvas_size_x = 5  # size in pixels. corresponds to a size of 5x5 inches with 100 dpi
         initial_canvas_size_y = 5
         self.max_resolution = 500
         self.dpi = self.max_resolution // initial_canvas_size_x
 
-        self.canvas = FigureCanvas(Figure(figsize=(initial_canvas_size_x, initial_canvas_size_y), dpi=self.dpi, facecolor='white'))
+        self.canvas = FigureCanvas(Figure(figsize=(initial_canvas_size_x, initial_canvas_size_y),
+                                          dpi=self.dpi, facecolor='white'))
+
         self.ax = self.canvas.figure.subplots()
         self.ax.axis('off')
         self.canvas.figure.subplots_adjust(0, 0, 1, 1)
@@ -235,7 +246,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.slice_slider = QtWidgets.QSlider(orientation=QtCore.Qt.Vertical, parent=self)
         self.slice_slider.valueChanged.connect(self.update_slice)
 
-        # define a text field to display image coordinates
+        # define a text field to display image coordinates and one for the current zoom
         bottom_bar_layout = QtWidgets.QHBoxLayout()
         self.zoom_label = QtWidgets.QLabel('{} %'.format(self.current_zoom))
         self.pixel_info_label = PixelInfoQLabel(parent=self)
@@ -255,52 +266,84 @@ class ImageViewer(QtWidgets.QWidget):
         self.canvas.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.canvas.setFocus()
 
+        # prevent the slider from gaining focus
+        self.slice_slider.setFocusPolicy(QtCore.Qt.NoFocus)
+
+        # initialize the showing image
         self.init_image()
 
+        # define the interactor for user inputs
         self.interactor_style = ImageViewerInteractor(self)
 
+        # show the widget
         self.show()
 
     def init_image(self):
+        """ Initial call after the image has been set or reset.
+
+        Constructs the image array and plots the middle slice of the image with window/level spanning the whole
+        grey value range of the image.
+        """
         # DON'T swap axes, in order to keep the fastest dimension of the np array the first
         # -> z-slices are the most performant
         self.image_array = sitk.GetArrayFromImage(self.image)
 
-        self.current_slice = self.get_slice_range()[1] // 2
+        # take the middle slice as initial slice shown
+        self.current_slice = self.get_slice_dim_size() // 2
 
+        # redraw if there is already a plot
         if self.im_plot is not None:
             self.im_plot.remove()
 
         self.im_plot = self.ax.imshow(self.image_array[index_compatibility(get_3d_plane_index(self.current_slice, self.orientation))],
                                       aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()))
 
+        # set the window/level to span the whole greyvalue range of the image
         min_grey = self.image_array.min()
         max_grey = self.image_array.max()
         self.greyval_range = [min_grey, max_grey]
         self.reset_window_level()
 
+        # init the coordinate label
         initial_coords = [0, 0]
         initial_coords.insert(self.orientation, self.current_slice)
         self.show_pixel_info(initial_coords)
 
-        self.update_slider()
+        # init the slider with the correct range
+        self.adapt_slider()
 
-    def change_orientation(self, orientation):
+    def change_orientation(self, orientation: Union[int, str]):
+        """ Change the slicing dimension of the viewer.
+        Orientation values are expected as in SLICE_ORIENTATION
+
+        @param orientation:
+            either the number corresponding to the slicing dimension or a string of the new plane:
+                                'xy' or 2 -> the XY plane is shown;
+                                'xz' or 1 -> the XZ plane is shown;
+                                'yz' or 0 -> the YZ plane is shown;
+        """
+        # don't do anything if orientation stays the same
+        if orientation == self.orientation:
+            return
+
         if orientation not in SLICE_ORIENTATION.keys() and orientation not in SLICE_ORIENTATION.values():
             print('Cannot change viewer orientation to {}. Use one of {} or {} respectively.'.
                   format(orientation, SLICE_ORIENTATION.keys(), SLICE_ORIENTATION.values()))
 
+        # convert the plane string into the number of the slice dimension
         if isinstance(orientation, str):
             orientation = SLICE_ORIENTATION[orientation]
 
-        if orientation == self.orientation:
-            return
-
         self.orientation = orientation
         self.redraw_slice()
-        self.update_slider()
+        self.adapt_slider()
 
-    def set_window_level(self, window, level):
+    def set_window_level(self, window: Union[int, float], level: Union[int, float]):
+        """ Window levelling operation on the image.
+
+        @param window: width of the window
+        @param level: window center
+        """
         if window < 0:
             # set a minimum level (could be even smaller in case of normalized images with values in [0,1])
             window = 1e-5
@@ -315,13 +358,21 @@ class ImageViewer(QtWidgets.QWidget):
         print('Window: {}, Level: {}'.format(self.current_window, self.current_level))
 
     def reset_window_level(self):
+        """ Set the window/level to span the entire grey value range of the image.
+        """
         # reset to cover the entire image range
         window = self.greyval_range[1] - self.greyval_range[0]
         level = self.greyval_range[0] + window / 2
         self.set_window_level(window, level)
 
-    def update_slice(self, new_slice):
-        lower, upper = self.get_slice_range()
+    def update_slice(self, new_slice: int):
+        """ Sets the current slice and redraws the image
+
+        @param new_slice: the slice index
+        """
+        # if the index is not in range, change it to the min or max index
+        lower = 0
+        upper = self.get_slice_dim_size()
         if not lower <= new_slice < upper:
             new_slice = lower if new_slice < lower else upper - 1
 
@@ -329,8 +380,13 @@ class ImageViewer(QtWidgets.QWidget):
         self.redraw_slice()
 
     def redraw_slice(self):
-        # todo: Blitting
-        img_slice = self.image_array[index_compatibility(get_3d_plane_index(slice_index=self.current_slice, orientation=self.orientation))]
+        """ Draws the current slice of the image with mask and markers.
+        This resets the current zoom factor but not the window/level.
+        """
+        # maybe todo: Blitting
+
+        img_slice = self.image_array[
+            index_compatibility(get_3d_plane_index(slice_index=self.current_slice, orientation=self.orientation))]
 
         # set extent to be according to dimensions so that nothing gets squished
         y_max, x_max = img_slice.shape
@@ -345,38 +401,52 @@ class ImageViewer(QtWidgets.QWidget):
         self.im_plot = self.ax.imshow(img_slice, vmin=self.current_level - half_window, vmax=self.current_level + half_window,
                                       aspect=get_aspect_ratio_for_plane(self.image.GetSpacing(), self.orientation, self.image.GetSize()))
 
+        # update the coordinate text
         self.pixel_info_label.set_coordinate(self.orientation, self.current_slice)
-        self.show_pixel_info(self.pixel_info_label.coords)  # TODO: move this to label class?
+        self.show_pixel_info(self.pixel_info_label.coords)
 
         # reset zoom factor
         self.zoom_label.setText('100 %')
         self.current_zoom = 100
 
+        # draw masks and markers
         self.update_masks()
         self.scatter_markers()
 
+        # update the canvas (making sure this is only called once per update for performance)
         self.canvas.draw()
 
-    def zoom(self, percent, center_x=None, center_y=None):
+    def zoom(self, percent: Union[int, float], center_x: Union[int, float] = None, center_y: Union[int, float] = None):
+        """ Zoom the image to a given zoom factor.
+        Center can be left out; in this case, the zoom center is equal to the image center.
+
+        @param percent: the zoom factor in percent (no values smaller than 100% are accepted)
+        @param center_x: optional x value of the zoom center in continuous axes coordinates
+        @param center_y: optional y value of the zoom center in continuous axes coordinates
+        """
+        # making the image smaller than original does not make sense
         if percent < 100:
             return
 
         self.current_zoom = percent
 
+        # get the sizes of the current plane dimensions
         plane_dimensions = list(self.image.GetSize()[d] for d in range(3) if d != self.orientation)
 
+        # choose the image center as zoom center if not specified
         if center_x is None:
             center_x = (plane_dimensions[0] - 1) / 2
         if center_y is None:
             center_y = (plane_dimensions[1] - 1) / 2
 
+        # compute the necessary axes limits w.r.t. the zoom factor
         half_range_x = plane_dimensions[0] / 2 / (percent / 100)
         half_range_y = plane_dimensions[1] / 2 / (percent / 100)
 
         x_limits = [center_x - half_range_x, center_x + half_range_x]
         y_limits = [center_y - half_range_y, center_y + half_range_y]
 
-        # adjust limits to keep the image in the figure
+        # shift limits to keep the image in the figure
         for dim, limits in enumerate([x_limits, y_limits]):
             shift = 0
             if limits[0] < 0:
@@ -387,6 +457,7 @@ class ImageViewer(QtWidgets.QWidget):
             limits[0] += shift
             limits[1] += shift
 
+        # modify the image figure
         self.ax.set_xlim(*x_limits)
         self.ax.set_ylim(*y_limits)
 
@@ -394,25 +465,48 @@ class ImageViewer(QtWidgets.QWidget):
 
         self.canvas.draw()
 
-    def get_slice_range(self):
-        return 0, self.image.GetSize()[self.orientation]
+    def get_slice_dim_size(self) -> int:
+        """ Get the size of the slicing dimension (found in self.orientation)
 
-    def update_slider(self):
-        self.slice_slider.setRange(self.get_slice_range()[0], self.get_slice_range()[1]-1)
+        @return: the size of the current slicing dimension
+        """
+        return self.image.GetSize()[self.orientation]
+
+    def adapt_slider(self):
+        """ Call this, if the image slice range or the current slice changed.
+        The slider value and range will be adapted to these values
+        """
+        self.slice_slider.setRange(0, self.get_slice_dim_size() - 1)
         self.slice_slider.setValue(self.current_slice)
 
-    def move_slice(self, delta):
-        # moves the slider, which in turn changes the slice
+    def move_slice(self, delta: int):
+        """ Change the current slice by delta steps and then redraw.
+
+        @param delta: the number of steps by which to change the current slice (positive or negative)
+        """
+        # moves the slider, which in turn changes the slice and redraws the image
         self.slice_slider.setValue(self.current_slice + delta)  # TODO: kind of a workaround
 
-    def add_marker(self, position):
+    def add_marker(self, position: Sequence[Union[float, int]]):
+        """ Adds a marker to the given pixel position, saves and displays it.
+
+        @param position: continuous 3d pixel position of the new marker
+        """
         assert len(position) == 3
         marker = ImageMarker(position)
         self.markers.append(marker)
-        self.scatter_markers()
-        self.canvas.draw()
 
-    def remove_markers(self, only_last=False):
+        # only redraw markers, if the new marker is in the current slice
+        if round(position[self.orientation]) == self.current_slice:
+            self.scatter_markers()
+            self.canvas.draw()
+
+    def remove_markers(self, only_last: bool = False):
+        """ Remove all (or only the last) markers from the image.
+        This does not only apply to visible markers, but markers in all slices.
+
+        @param only_last: if true, only the last marker will be removed; otherwise all markers get removed
+        """
         if len(self.markers) == 0:
             return
 
@@ -421,43 +515,83 @@ class ImageViewer(QtWidgets.QWidget):
         else:
             self.markers.clear()
 
+        # redraw markers
         self.scatter_markers()
         self.canvas.draw()
 
     def scatter_markers(self):
+        """ Draw all markers in the current slice on the image.
+        Attention: this does not redraw the whole canvas, self.canvas.draw() has to be called separately.
+        This way, multiple changes can be drawn at once, for instance after a new slice is shown.
+        """
+        # determine which markers are found in the current slice
         markers_in_slice = []
         for m in self.markers:
             pixel_pos = np.array(m.pixel_position)
-            if abs(pixel_pos[self.orientation] - self.current_slice) < 0.5:
+            # choose a marker if the rounded index is the same as the current slice
+            if round(pixel_pos[self.orientation]) == self.current_slice:
+                # only take the plane coordinates
                 markers_in_slice.append(pixel_pos[np.arange(3) != self.orientation])
 
         if len(markers_in_slice) != 0:
+            # combine marker coordinates into one array and and show it in a scatter plot
             np_markers = np.stack(markers_in_slice, axis=1)
             self.marker_plot.set_offsets(np_markers.swapaxes(0, 1))
         else:
+            # if no markers are found, clear remove the current plot and replace it with an empty one
             self.marker_plot.remove()
             self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR, s=ImageMarker.STANDARD_SIZE)
 
-    def add_mask(self, mask):
+    def add_mask(self, mask: ImageMask):
+        """ Show a mask overlay on top of the current image. The mask has to have the same size, spacing and origin.
+
+        @param mask: the mask to overlay (has to have the same properties as the image)
+        """
         if not compatible_metadata(self.image, mask.itk_mask):
             return
 
+        # save the mask in the masks dict
         self.masks[mask] = None
+
+        # draw the image
         self.update_masks()
         self.canvas.draw()
 
     def update_masks(self):
-        self.clear_masks()
+        """ Draw the masks in the current slice as an overlay on top of the image.
+
+        Attention: this does not redraw the whole canvas, self.canvas.draw() has to be called separately.
+        This way, multiple changes can be drawn at once, for instance after a new slice is shown.
+        """
+        # remove old plots
+        self.clear_mask_plots()
+
+        # draw each mask (no changes to canvas before canvas.draw() is called)
         for m in self.masks.keys():
             self.masks[m] = add_mask_to_image(self.ax, m.get_slice(self.current_slice, self.orientation),
                                               aspect=get_aspect_ratio_for_plane(m.get_spacing(), self.orientation, self.image.GetSize()),
                                               alpha=m.alpha, color=m.color)
 
-    def set_image(self, image):
+    def clear_mask_plots(self):
+        """ Remove all masks from the canvas.
+        """
+        for m in self.masks.keys():
+            try:
+                # remove the existing plot
+                self.masks[m].remove()
+            except AttributeError:
+                # if the mask was not there in the previous slice it is None here
+                pass
+
+    def set_image(self, image: sitk.Image):
+        """ Set the image and show it. This resets all markers and masks previously added to the viewer.
+
+        @param image: the new image to show
+        """
         self.image = image
 
         # remove old masks
-        self.clear_masks()
+        self.clear_mask_plots()
         self.masks.clear()
 
         # remove old markers
@@ -467,24 +601,22 @@ class ImageViewer(QtWidgets.QWidget):
         # draw image and re-init everything else
         self.init_image()
 
-    def clear_masks(self):
-        for m in self.masks.keys():
-            try:
-                # remove the existing plots
-                self.masks[m].remove()
-            except AttributeError:
-                # if the mask was not there in the previous slice it is None here
-                pass
+    def show_pixel_info(self, pixel_coords: Sequence[Union[float, int]]):
+        """ Show the given coordinates and the corresponding image intensity in a label below the image.
+        For instance, this is called whenever whenever the user moves the mouse over the image.
 
-    def show_pixel_info(self, pixel_coords):
+        @param pixel_coords: the (continuous) coordinatates to be displayed in the label
+        """
         if pixel_coords is None:
+            # remove the label text
             self.pixel_info_label.clear()
         else:
-            x, y, z = [int(ind) for ind in pixel_coords]  # attention to different indexing of np array from itk image
+            # take the discrete index
+            x, y, z = [int(ind) for ind in pixel_coords]
             try:
                 self.pixel_info_label.set_values(x, y, z, self.image.GetPixel(x, y, z))
             except (RuntimeError, TypeError):
-                # gets thrown if x, y, z are out of bounds of the image (this happens on the edges of the figure)
+                # gets thrown if x, y, z are out of bounds of the image (this can happen on the edges of the figure)
                 return
 
 
@@ -540,6 +672,12 @@ class ImageViewerInteractor:
             self.iv.change_orientation(SLICE_ORIENTATION['xz'])
         elif event.key == 'z':
             self.iv.change_orientation(SLICE_ORIENTATION['xy'])
+        elif event.key == 'pageup':
+            # emulate the page-up behaviour of the QSlider (as this is never focused)
+            self.iv.move_slice(self.iv.slice_slider.pageStep())
+        elif event.key == 'pagedown':
+            # emulate the page-down behaviour of the QSlider (as this is never focused)
+            self.iv.move_slice(- self.iv.slice_slider.pageStep())
 
     def handle_mouse_button_down(self, event):
         print(event.button)
@@ -595,7 +733,7 @@ class ImageViewerInteractor:
 
         if event.key == 'control':
             # if ctrl key is pressed while scrolling: zoom image
-
+            # TODO: make zoom feel better, e.g.: zooming out is the exact reverse of zoom in if mouse was not moved.
             if not event.inaxes:
                 # choose the figure center as zoom center if mouse outside of figure
                 center_x = self.last_mouse_position_in_figure[0]
@@ -641,100 +779,6 @@ class ImageViewerInteractor:
         # self.iv.canvas.draw()
         # self.iv.dpi = new_dpi
         # self.iv.redraw_slice()
-
-
-class ImageMask:
-    def __init__(self, itk_binary_image, alpha=0.3, color='r'):
-        self.itk_mask = itk_binary_image
-        self.mask_as_array = sitk.GetArrayFromImage(self.itk_mask)
-        self.alpha = alpha
-        self.color = color
-
-    def get_slice(self, slice_index, orientation):
-        return self.mask_as_array[index_compatibility(get_3d_plane_index(slice_index, orientation))]
-
-    def get_spacing(self):
-        return self.itk_mask.GetSpacing()
-
-
-class ImageMarker:
-    STANDARD_COLOR = 'b'  # follows matplotlib colors definitions
-    STANDARD_SIZE = 10  # size of markers in pt
-
-    def __init__(self, pixel_position):
-        assert len(pixel_position) == 3
-        self.pixel_position = pixel_position
-
-    def __str__(self):
-        return 'ImageMarker at pixel position ({}, {}, {})'.format(*self.pixel_position)
-
-
-def get_3d_plane_index(slice_index, orientation):
-    index = [slice(0, None), slice(0, None)]  # get the whole dimensions of planar axes
-    index.insert(orientation, slice_index)
-    return tuple(index)
-
-
-def get_aspect_ratio_for_plane(spacing, orientation, image_dimensions):
-    dims = list(d for d in range(3) if d != orientation)
-    ratio = spacing[dims[1]] * image_dimensions[1] / (spacing[dims[0]] * image_dimensions[0])
-    return ratio
-
-
-def compatible_metadata(image1: sitk.Image, image2: sitk.Image, check_size=True, check_spacing=True, check_origin=True):
-    all_parameters_equal = True
-    tolerance = 1e-4
-
-    if check_size:
-        size1 = image1.GetSize()
-        size2 = image2.GetSize()
-        if size1 != size2:
-            all_parameters_equal = False
-            print(f'Images do not have the same size ({size1} != {size2})')
-
-    if check_spacing:
-        spacing1 = image1.GetSpacing()
-        spacing2 = image2.GetSpacing()
-        if any(list(abs(s1-s2) > tolerance for s1, s2 in zip(spacing1, spacing2))):
-            all_parameters_equal = False
-            print(f'Images do not have the same spacing ({spacing1} != {spacing2})')
-
-    if check_origin:
-        origin1 = image1.GetOrigin()
-        origin2 = image2.GetOrigin()
-        if any(list(abs(o1-o2) > tolerance for o1, o2 in zip(origin1, origin2))):
-            all_parameters_equal = False
-            print(f'Images do not have the same origin ({origin1} != {origin2})')
-
-    return all_parameters_equal
-
-
-def index_compatibility(index):
-    # change to the other method (sitk uses x, y, z, numpy uses z, y, x
-    assert len(index) == 3
-    return index[-1::-1]
-
-
-def pix2world(index, spacing):
-    assert len(index) == len(spacing)
-    return tuple(i*s for i, s in zip(index, spacing))
-
-
-def world2pix(index, spacing):
-    assert len(index) == len(spacing)
-    return tuple(i/s for i, s in zip(index, spacing))
-
-
-def add_mask_to_image(ax, mask, aspect, alpha=0.3, color='r'):
-    """ can be multilabel, if mask is given as (x, y, l) with l different binary images """
-    if mask.sum() == 0:
-        return None
-
-    cmap = ListedColormap([color])
-    mask = np.ma.masked_where(mask == 0, mask)
-    plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha)
-
-    return plot
 
 
 if __name__ == '__main__':
