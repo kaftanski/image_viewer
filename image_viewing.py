@@ -1,12 +1,12 @@
+import atexit
 import sys
 from typing import List, Union
 
+import SimpleITK as sitk
 from PyQt5.QtWidgets import QApplication
 
-from lightweight_viewer import LightWeightViewer
 from image_classes import ImageMask
-import SimpleITK as sitk
-
+from lightweight_viewer import LightWeightViewer
 
 _viewer_queue = []
 
@@ -61,9 +61,7 @@ def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True
     @return: execution code of the viewer application if return_markers is false, otherwise the markers are returned.
     """
     # get the active Qt application or create a new one
-    if QApplication.instance() is not None:
-        app = QApplication.instance()
-    else:
+    if QApplication.instance() is None:
         app = QApplication(sys.argv)
 
     # construct the new viewer with the input image
@@ -72,12 +70,7 @@ def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True
 
     if blocking:
         # start app and show all previously invisible viewers
-        for v in _viewer_queue:
-            v.show()
-        exec_code = app.exec_()  # start the Qt event loop (blocking all further execution)
-
-        # remove the viewers already shown
-        _viewer_queue.clear()
+        exec_code = _show_viewers_in_queue()
     else:
         # nothing wrong because no execution of event loop
         exec_code = 0
@@ -87,6 +80,29 @@ def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True
         return widget.get_markers_for_region_growing()
     else:
         return exec_code
+
+
+def _show_viewers_in_queue() -> int:
+    """ Shows all viewers in _viewer_queue.
+
+    @return: execution code of the viewer application. this equals 0 if the application terminated without error.
+    """
+    app = QApplication.instance()
+
+    # show viewers, if app exists and there are viewers left to show
+    if app is not None and len(_viewer_queue) > 0:
+        for v in _viewer_queue:
+            v.show()
+        exec_code = app.exec_()  # start the Qt event loop (blocking all further execution)
+        # remove the viewers already shown
+        _viewer_queue.clear()
+        return exec_code
+    else:
+        return 0
+
+
+# register exit hook that shows all previously not shown viewers (happens when the last opened viewer is non blocking)
+atexit.register(_show_viewers_in_queue)
 
 
 if __name__ == '__main__':
