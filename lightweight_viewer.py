@@ -232,7 +232,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.dpi = self.max_resolution // initial_canvas_size_x
 
         self.canvas = FigureCanvas(Figure(figsize=(initial_canvas_size_x, initial_canvas_size_y),
-                                          dpi=self.dpi, facecolor='white'))
+                                          dpi=self.dpi, facecolor='black'))
 
         self.ax = self.canvas.figure.subplots()
         self.ax.axis('off')
