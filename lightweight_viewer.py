@@ -28,7 +28,7 @@ SLICE_ORIENTATION = {'xy': 2, 'xz': 1, 'yz': 0}
 
 class LightWeightViewer(QtWidgets.QMainWindow):
     """ A PyQt window with matplotlib-based viewer of a given image """
-    def __init__(self, image: sitk.Image, title: str = 'IMI Image Viewer', mask: ImageMask = None):
+    def __init__(self, image: sitk.Image, title: str = '', mask: ImageMask = None):
         """ Constructor with intitial image to be shown
 
         @param image: SimpleITK Image to be shown
@@ -44,7 +44,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         self.setCentralWidget(self.image_viewer)
         # self.addToolBar(NavigationToolbar(self.image_viewer.canvas, self))
         self.init_menu_bar()
-        self.setWindowTitle(title)
+        self.setWindowTitle(title if title != '' else 'IMI Image Viewer')
         self.show()
 
     def get_markers_for_region_growing(self) -> List[List[int]]:
