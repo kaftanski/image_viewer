@@ -335,6 +335,11 @@ class ImageViewer(QtWidgets.QWidget):
             orientation = SLICE_ORIENTATION[orientation]
 
         self.orientation = orientation
+
+        # make sure the current slice is valid in the new orientation
+        if self.current_slice >= self.get_slice_dim_size():
+            self.current_slice = self.get_slice_dim_size() - 1
+
         self.redraw_slice()
         self.adapt_slider()
 
