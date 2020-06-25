@@ -7,7 +7,7 @@ import matplotlib as mpl
 import numpy as np
 from PyQt5.QtWidgets import QAction
 from matplotlib.backend_bases import MouseButton
-from matplotlib.backends.backend_qt5agg import FigureCanvas
+from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
 
@@ -42,7 +42,6 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             self.image_viewer.add_mask(mask)
 
         self.setCentralWidget(self.image_viewer)
-        # self.addToolBar(NavigationToolbar(self.image_viewer.canvas, self))
         self.init_menu_bar()
         self.setWindowTitle(title if title != '' else 'IMI Image Viewer')
         self.show()
@@ -111,23 +110,15 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         marker_submenu = view_menu.addMenu('&Marker')
         marker_submenu.addActions([clear_markers_action, remove_last_marker_action])
 
-        zoom_action = QAction('&Zoom...', self)
-        zoom_action.setStatusTip('Choose a zoom factor')
-        zoom_action.triggered.connect(self.zoom_dialog)
+        # zoom_action = QAction('&Zoom...', self)
+        # zoom_action.setStatusTip('Choose a zoom factor')
+        # zoom_action.triggered.connect(self.zoom_dialog)
 
         reset_wl_action = QAction('&Reset Window / Level', self)
         reset_wl_action.setStatusTip('Reset window-levelling to span the entire image range')
         reset_wl_action.triggered.connect(self.image_viewer.reset_window_level)
 
-        view_menu.addActions([zoom_action, reset_wl_action])
-
-    def zoom_dialog(self):
-        """ Opens an input dialog for a desired zoom factor and zooms the image
-        """
-        new_zoom_factor, ok = QtWidgets.QInputDialog.getInt(self, 'Zoom', 'Percentage:', min=100, step=20,
-                                                        value=self.image_viewer.current_zoom)
-        if ok:
-            self.image_viewer.zoom(percent=new_zoom_factor)
+        view_menu.addAction(reset_wl_action)
 
     def file_dialog(self, caption: str, filter_prompt: str, mode: str = 'save') -> str:
         """ Shows an open or save file dialog and returns the picked path as a string
@@ -241,6 +232,10 @@ class ImageViewer(QtWidgets.QWidget):
         self.marker_plot = self.ax.scatter([], [], c=ImageMarker.STANDARD_COLOR)
 
         self.canvas.setParent(self)
+
+        # add a hidden mpl toolbar for panning & zooming functionality
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.toolbar.hide()
 
         # define a slider for image slicing
         self.slice_slider = QtWidgets.QSlider(orientation=QtCore.Qt.Vertical, parent=self)
@@ -419,55 +414,6 @@ class ImageViewer(QtWidgets.QWidget):
         self.scatter_markers()
 
         # update the canvas (making sure this is only called once per update for performance)
-        self.canvas.draw()
-
-    def zoom(self, percent: Union[int, float], center_x: Union[int, float] = None, center_y: Union[int, float] = None):
-        """ Zoom the image to a given zoom factor.
-        Center can be left out; in this case, the zoom center is equal to the image center.
-
-        @param percent: the zoom factor in percent (no values smaller than 100% are accepted)
-        @param center_x: optional x value of the zoom center in continuous axes coordinates
-        @param center_y: optional y value of the zoom center in continuous axes coordinates
-        """
-        # making the image smaller than original does not make sense
-        if percent < 100:
-            return
-
-        self.current_zoom = percent
-
-        # get the sizes of the current plane dimensions
-        plane_dimensions = list(self.image.GetSize()[d] for d in range(3) if d != self.orientation)
-
-        # choose the image center as zoom center if not specified
-        if center_x is None:
-            center_x = (plane_dimensions[0] - 1) / 2
-        if center_y is None:
-            center_y = (plane_dimensions[1] - 1) / 2
-
-        # compute the necessary axes limits w.r.t. the zoom factor
-        half_range_x = plane_dimensions[0] / 2 / (percent / 100)
-        half_range_y = plane_dimensions[1] / 2 / (percent / 100)
-
-        x_limits = [center_x - half_range_x, center_x + half_range_x]
-        y_limits = [center_y - half_range_y, center_y + half_range_y]
-
-        # shift limits to keep the image in the figure
-        for dim, limits in enumerate([x_limits, y_limits]):
-            shift = 0
-            if limits[0] < 0:
-                shift = -limits[0]
-            elif limits[1] > plane_dimensions[dim] - 1:
-                shift = ((plane_dimensions[dim] - 1) - limits[1])
-
-            limits[0] += shift
-            limits[1] += shift
-
-        # modify the image figure
-        self.ax.set_xlim(*x_limits)
-        self.ax.set_ylim(*y_limits)
-
-        self.zoom_label.setText('{} %'.format(percent))
-
         self.canvas.draw()
 
     def get_slice_dim_size(self) -> int:
@@ -736,6 +682,8 @@ class ImageViewerInteractor:
             self.on_left_button_down(event)
         elif event.button == MouseButton.RIGHT:
             self.on_right_button_down(event)
+        elif event.button == MouseButton.MIDDLE:
+            self.on_middle_button_down(event)
 
     def handle_mouse_button_up(self, event: mpl.backend_bases.MouseEvent):
         """ Handles mouse button up events by distributing event to
@@ -755,7 +703,7 @@ class ImageViewerInteractor:
 
         @param event: the mpl.backend_bases.MouseEvent to handle
         """
-        if event.inaxes:
+        if event.inaxes and self.iv.toolbar.mode == '':
             # click inside of figure
             event_data_position = [event.xdata, event.ydata]
             event_data_position.insert(self.iv.orientation, self.iv.current_slice)
@@ -770,7 +718,16 @@ class ImageViewerInteractor:
         """
         pass
 
-    def on_right_button_down(self, event):
+    def on_middle_button_down(self, event: mpl.backend_bases.MouseEvent):
+        """ Left mouse button down event handler:
+             toggles zoom/pan mode from the mpl NavigationToolbar and deactivates marker/window-levelling functionality
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
+        # start zoom/pan mode
+        self.iv.toolbar.pan()
+
+    def on_right_button_down(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button down event handler:
              starts the window levelling.
              Moving the mouse while the right mouse button is pressed does window levelling.
@@ -778,8 +735,10 @@ class ImageViewerInteractor:
 
         @param event: the mpl.backend_bases.MouseEvent to handle
         """
-        # start window levelling
-        self.window_level_start_position = [event.x, event.y]
+        # if panning / zooming is not activated
+        if self.iv.toolbar.mode == '':
+            # start window levelling
+            self.window_level_start_position = [event.x, event.y]
 
     def on_right_button_up(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button down event handler:
@@ -839,27 +798,12 @@ class ImageViewerInteractor:
             steps += adjust
             self.mouse_wheel_step_residual = residual - adjust  # update the residual
 
-        if event.key == 'control':
-            # if ctrl key is pressed while scrolling: zoom image
-            # TODO: make zoom feel better, e.g.: zooming out is the exact reverse of zoom in if mouse was not moved.
-            if not event.inaxes:
-                # choose the figure center as zoom center if mouse outside of figure
-                center_x = self.last_mouse_position_in_figure[0]
-                center_y = self.last_mouse_position_in_figure[1]
-            else:
-                center_x = event.xdata
-                center_y = event.ydata
+        # move slice by steps
+        self.iv.move_slice(steps)
 
-            # one step corresponds to 20 % zoom
-            new_zoom = self.iv.current_zoom + steps * 20
-            self.iv.zoom(percent=new_zoom, center_x=center_x, center_y=center_y)
-        else:
-            # move slice by steps
-            self.iv.move_slice(steps)
-
-            # update the coordinate label to show the new slice
-            self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
-            self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
+        # update the coordinate label to show the new slice
+        self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
+        self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
 
     def on_resize(self, event: mpl.backend_bases.ResizeEvent):
         """ *TODO* Changes the dpi of the figure, so that the resolution does not change.
