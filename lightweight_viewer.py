@@ -1,6 +1,7 @@
 import os
 from math import floor, copysign
 from typing import Union, List, Sequence
+import codecs
 
 import SimpleITK as sitk
 import matplotlib as mpl
@@ -97,6 +98,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         yz_orientation_action.triggered.connect(lambda: self.image_viewer.change_orientation(SLICE_ORIENTATION_YZ))
 
         orientation_submenu.addActions([xy_orientation_action, xz_orientation_action, yz_orientation_action])
+        view_menu.addSeparator()
 
         clear_markers_action = QAction('&Clear all markers', self)
         clear_markers_action.setStatusTip('Clear all markers from all images')
@@ -107,18 +109,30 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         remove_last_marker_action.setShortcut('Ctrl+Z')
         remove_last_marker_action.triggered.connect(lambda: self.image_viewer.remove_markers(only_last=True))
 
-        marker_submenu = view_menu.addMenu('&Marker')
-        marker_submenu.addActions([clear_markers_action, remove_last_marker_action])
-
-        # zoom_action = QAction('&Zoom...', self)
-        # zoom_action.setStatusTip('Choose a zoom factor')
-        # zoom_action.triggered.connect(self.zoom_dialog)
+        # marker_submenu = view_menu.addMenu('&Marker')
+        view_menu.addActions([clear_markers_action, remove_last_marker_action])
+        view_menu.addSeparator()
 
         reset_wl_action = QAction('&Reset Window / Level', self)
         reset_wl_action.setStatusTip('Reset window-levelling to span the entire image range')
         reset_wl_action.triggered.connect(self.image_viewer.reset_window_level)
 
         view_menu.addAction(reset_wl_action)
+
+        help_menu = menubar.addMenu('&Help')
+        controls_action = help_menu.addAction('Controls...')
+        controls_action.triggered.connect(self.show_controls)
+
+    def show_controls(self):
+        """ Open an information dialog detailing the viewer's controls
+        """
+        message_box = QtWidgets.QMessageBox(self)
+        message_box.setWindowTitle('Controls')
+        message_box.setTextFormat(QtCore.Qt.RichText)
+        with codecs.open('./controls.html', 'r') as ctrls_html:
+            message_box.setText(ctrls_html.read())
+
+        message_box.exec_()
 
     def file_dialog(self, caption: str, filter_prompt: str, mode: str = 'save') -> str:
         """ Shows an open or save file dialog and returns the picked path as a string
