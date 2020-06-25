@@ -691,10 +691,10 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('resize_event', self.on_resize)
 
         self.last_mouse_position_in_figure = [0, 0]
-        self.window_level_start_position = None  # set on right mouse down in order to determine the new w/l
+        self.window_level_start_position = None  # is set on right mouse down in order to determine the new w/l
         self.mouse_wheel_step_residual = 0  # accumulating mousewheel movements, if they dont add up to a whole step
 
-    def on_key_press(self, event):
+    def on_key_press(self, event: mpl.backend_bases.KeyEvent):
         """ Handles all keys pressed by the user.
         Key -> Functionality:
             up -> move slice forward by 1
@@ -725,7 +725,7 @@ class ImageViewerInteractor:
             # emulate the page-down behaviour of the QSlider (as this is never focused)
             self.iv.move_slice(- self.iv.slice_slider.pageStep())
 
-    def handle_mouse_button_down(self, event):
+    def handle_mouse_button_down(self, event: mpl.backend_bases.MouseEvent):
         """ Handles mouse button down events by distributing event to
         self.on_left_button_down or self.on_right_button_down respectively.
 
@@ -737,7 +737,7 @@ class ImageViewerInteractor:
         elif event.button == MouseButton.RIGHT:
             self.on_right_button_down(event)
 
-    def handle_mouse_button_up(self, event):
+    def handle_mouse_button_up(self, event: mpl.backend_bases.MouseEvent):
         """ Handles mouse button up events by distributing event to
         self.on_left_button_up or self.on_right_button_up respectively.
 
@@ -749,7 +749,7 @@ class ImageViewerInteractor:
         elif event.button == MouseButton.RIGHT:
             self.on_right_button_up(event)
 
-    def on_left_button_down(self, event):
+    def on_left_button_down(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button down event handler:
              if click was inside the figure, a marker is placed at the mouse position
 
@@ -762,7 +762,7 @@ class ImageViewerInteractor:
             print('adding marker at {}'.format(event_data_position))
             self.iv.add_marker(event_data_position)
 
-    def on_left_button_up(self, event):
+    def on_left_button_up(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button up event handler:
              no functionality.
 
@@ -781,7 +781,7 @@ class ImageViewerInteractor:
         # start window levelling
         self.window_level_start_position = [event.x, event.y]
 
-    def on_right_button_up(self, event):
+    def on_right_button_up(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button down event handler:
              end of window levelling
 
@@ -789,7 +789,7 @@ class ImageViewerInteractor:
         """
         self.window_level_start_position = None
 
-    def on_mouse_motion(self, event):
+    def on_mouse_motion(self, event: mpl.backend_bases.MouseEvent):
         """ Handles mouse movement events:
              if mouse is over the image, the coordinates and intensity under the cursor are displayed.
              if right mouse button is pressed, window/levelling is carried out
@@ -823,7 +823,7 @@ class ImageViewerInteractor:
 
             self.iv.set_window_level(new_window, new_level)
 
-    def on_mousewheel_event(self, event):
+    def on_mousewheel_event(self, event: mpl.backend_bases.MouseEvent):
         """ Handles mouse scrolling events:
              scrolling up moves slice forward, scrolling down moves slice backward.
              scrolling with ctrl key pressed zooms in or out with the cursor position as zoom center.
@@ -861,7 +861,7 @@ class ImageViewerInteractor:
             self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
             self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
 
-    def on_resize(self, event):
+    def on_resize(self, event: mpl.backend_bases.ResizeEvent):
         """ *TODO* Changes the dpi of the figure, so that the resolution does not change.
         Aims to increase performance on large window sizes.
 

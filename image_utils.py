@@ -2,8 +2,8 @@ from typing import Tuple, Union, Sequence
 
 import SimpleITK as sitk
 import numpy as np
-from matplotlib.colors import ListedColormap
 from matplotlib.axes import Axes
+from matplotlib.colors import ListedColormap
 from matplotlib.image import AxesImage
 
 
