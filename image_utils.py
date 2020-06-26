@@ -83,26 +83,24 @@ def index_compatibility(index: Sequence[int]) -> Sequence[int]:
     return index[::-1]
 
 
-def pix2world(pixel_coords: Sequence[Union[int, float]], spacing: Sequence[float]) -> Sequence[float]:
-    """ Converts pixel coordinates into world coordinates using the given voxel spacing.
+def pix2world(pixel_coords: Sequence[Union[int, float]], image: sitk.Image) -> Sequence[float]:
+    """ Converts pixel coordinates into world coordinates using the given image.
 
     @param pixel_coords: the pixel coordinates
-    @param spacing: the voxel spacing of an image
+    @param image: the image the index belongs to
     @return: the world coordinates
     """
-    assert len(pixel_coords) == len(spacing)
-    return tuple(i*s for i, s in zip(pixel_coords, spacing))
+    return image.TransformContinuousIndexToPhysicalPoint(index=pixel_coords)
 
 
-def world2pix(world_coords: Sequence[Union[int, float]], spacing: Sequence[float]) -> Sequence[float]:
-    """ Converts world coordinates into pixel coordinates using the given voxel spacing.
+def world2pix(world_coords: Sequence[Union[int, float]], image: sitk.Image) -> Sequence[float]:
+    """ Converts world coordinates into pixel coordinates using the given image.
 
     @param world_coords: the world coordinates
-    @param spacing: the voxel spacing of an image
+    @param image: the image the point belongs to
     @return: the pixel coordinates
     """
-    assert len(world_coords) == len(spacing)
-    return tuple(i/s for i, s in zip(world_coords, spacing))
+    return image.TransformPhysicalPointToContinuousIndex(world_coords)
 
 
 def add_mask_to_image(ax: Axes, mask: np.ndarray, aspect: float, alpha: float = 0.3, color: str = 'r') -> Union[AxesImage, None]:
