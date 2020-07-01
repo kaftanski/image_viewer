@@ -7,7 +7,7 @@ import SimpleITK as sitk
 import matplotlib as mpl
 import numpy as np
 from PyQt5.QtWidgets import QAction
-from matplotlib.backend_bases import MouseButton
+from matplotlib.backend_bases import MouseButton, cursors
 from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
@@ -257,9 +257,9 @@ class ImageViewer(QtWidgets.QWidget):
 
         # define a text field to display image coordinates and one for the current zoom
         bottom_bar_layout = QtWidgets.QHBoxLayout()
-        self.zoom_label = QtWidgets.QLabel('{} %'.format(self.current_zoom))
+        # self.zoom_label = QtWidgets.QLabel('{} %'.format(self.current_zoom))
         self.pixel_info_label = PixelInfoQLabel(parent=self)
-        bottom_bar_layout.addWidget(self.zoom_label)
+        # bottom_bar_layout.addWidget(self.zoom_label)
         bottom_bar_layout.addWidget(self.pixel_info_label)
 
         # layout the QtWidget
@@ -420,8 +420,8 @@ class ImageViewer(QtWidgets.QWidget):
         self.show_pixel_info(self.pixel_info_label.coords)
 
         # reset zoom factor
-        self.zoom_label.setText('100 %')
-        self.current_zoom = 100
+        # self.zoom_label.setText('100 %')
+        # self.current_zoom = 100
 
         # draw masks and markers
         self.update_masks()
@@ -710,6 +710,8 @@ class ImageViewerInteractor:
             self.on_left_button_up(event)
         elif event.button == MouseButton.RIGHT:
             self.on_right_button_up(event)
+        elif event.button == MouseButton.MIDDLE:
+            self.on_middle_button_up(event)
 
     def on_left_button_down(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button down event handler:
@@ -741,6 +743,12 @@ class ImageViewerInteractor:
         # start zoom/pan mode
         self.iv.toolbar.pan()
 
+        # update cursor manually (otherwise this is only done after the mouse is first moved)
+        if self.iv.toolbar.mode == "pan/zoom":
+            self.iv.toolbar.set_cursor(cursors.MOVE)  # grabbing hand
+        else:
+            self.iv.toolbar.set_cursor(cursors.POINTER)  # normal cursor
+
     def on_right_button_down(self, event: mpl.backend_bases.MouseEvent):
         """ Left mouse button down event handler:
              starts the window levelling.
@@ -761,6 +769,14 @@ class ImageViewerInteractor:
         @param event: the mpl.backend_bases.MouseEvent to handle
         """
         self.window_level_start_position = None
+
+    def on_middle_button_up(self, event: mpl.backend_bases.MouseEvent):
+        """ Left mouse button down event handler:
+             no functionality
+
+        @param event: the mpl.backend_bases.MouseEvent to handle
+        """
+        pass
 
     def on_mouse_motion(self, event: mpl.backend_bases.MouseEvent):
         """ Handles mouse movement events:
