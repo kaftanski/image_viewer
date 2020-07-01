@@ -257,9 +257,7 @@ class ImageViewer(QtWidgets.QWidget):
 
         # define a text field to display image coordinates and one for the current zoom
         bottom_bar_layout = QtWidgets.QHBoxLayout()
-        # self.zoom_label = QtWidgets.QLabel('{} %'.format(self.current_zoom))
         self.pixel_info_label = PixelInfoQLabel(parent=self)
-        # bottom_bar_layout.addWidget(self.zoom_label)
         bottom_bar_layout.addWidget(self.pixel_info_label)
 
         # layout the QtWidget
@@ -418,10 +416,6 @@ class ImageViewer(QtWidgets.QWidget):
         # update the coordinate text
         self.pixel_info_label.set_coordinate(self.orientation, self.current_slice)
         self.show_pixel_info(self.pixel_info_label.coords)
-
-        # reset zoom factor
-        # self.zoom_label.setText('100 %')
-        # self.current_zoom = 100
 
         # draw masks and markers
         self.update_masks()
