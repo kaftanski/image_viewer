@@ -3,7 +3,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QAction
 
-from old.imi_image_viewer import ImageViewer
+from vtk_viewer.vtk_image_viewer import ImageViewer
 
 
 class ImageContainer:
