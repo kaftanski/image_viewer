@@ -132,10 +132,10 @@ def show_in_interactive_figure(itk_image, fig):
 if __name__ == '__main__':
     fig = plt.figure(figsize=(5, 5), dpi=100)
     ax = fig.add_subplot(111)
-    test_image = itk.imread('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
+    test_image = itk.imread('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
     fig = show_in_interactive_figure(test_image, fig)
 
-    maskimage = itk.imread('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')
+    maskimage = itk.imread('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')
     maskimage = itk.array_view_from_image(maskimage)[60]
     # add_mask_image(ax, maskimage)
     plt.show()

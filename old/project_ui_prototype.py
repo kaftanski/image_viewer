@@ -28,7 +28,7 @@ class MainWindowHandler:
         pass
 
     def load_image(self):
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self.main_window, caption='Load Image', directory='/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages', filter='Image (*.nii.gz)')
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self.main_window, caption='Load Image', directory='/home/paul/Documents/imi_projects/MBV/MIPImages', filter='Image (*.nii.gz)')
         print('Loading image ' + file_path)
         try:
             file_name = file_path.split('/')[-1]
@@ -57,14 +57,14 @@ class ProjectMainWindow(QtWidgets.QMainWindow):
         self.show()
 
         self.add_image(sitk.ReadImage(
-            '/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz'),
+            '/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz'),
             'DWI')
 
         self.content.add_tab(to_input=False, label='test', image=sitk.ReadImage(
-            '/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_T1_reg.nii.gz'))
+            '/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_T1_reg.nii.gz'))
 
         self.add_image(sitk.ReadImage(
-            '/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_T1_reg.nii.gz'),
+            '/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_T1_reg.nii.gz'),
             'T1')
 
     def init_menuBar(self):

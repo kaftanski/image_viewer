@@ -106,6 +106,6 @@ atexit.register(_show_viewers_in_queue)
 
 
 if __name__ == '__main__':
-    # print(show_image_with_mask(None, sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')))
+    # print(show_image_with_mask(None, sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')))
     for m in show_and_return_markers(None, 'test'):
         print(m)

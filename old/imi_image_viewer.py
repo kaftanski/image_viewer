@@ -35,13 +35,13 @@ class ImageViewer(QtWidgets.QWidget):
 
         # now the vtk part for the actual image rendering
         # test_reader = vtk.vtkNIFTIImageReader()
-        # test_reader.SetFileName('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
+        # test_reader.SetFileName('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
         # test_reader.Update()
         # self.image = test_reader.GetOutput()
 
         if itk_image is None:
             # load example image
-            itk_image = sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_Flair_reg.nii.gz')
+            itk_image = sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_Flair_reg.nii.gz')
 
         self.itk_image = itk_image
         self.itk_to_vtk_image_filter = ITKtoVTKImageFilter()
@@ -150,7 +150,7 @@ class ImageViewer(QtWidgets.QWidget):
         self.masks.append(test_mask)
 
         label_overlay = sitk.LabelOverlayImageFilter()
-        overlayed = label_overlay.Execute(self.itk_image, sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
+        overlayed = label_overlay.Execute(self.itk_image, sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz'))
         overlayed = self.itk_to_vtk_image_filter(overlayed)
         self.vtk_image_viewer.SetInputDataObject(overlayed)
 
@@ -231,7 +231,7 @@ class ImageMask:
         self.label_map.PassAlphaToOutputOn()
 
         test_reader = vtk.vtkNIFTIImageReader()
-        test_reader.SetFileName('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')
+        test_reader.SetFileName('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')
         test_reader.Update()
 
         self.label_map.SetInputData(test_reader.GetOutput())

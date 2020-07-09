@@ -211,7 +211,7 @@ class ImageViewer(QtWidgets.QWidget):
             # image_data = sitk.GetImageFromArray(np.zeros((1, 1, 1)))
             # load example image TODO: remove this
             image_data = sitk.ReadImage(
-                '/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
+                '/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
 
         # init attributes
         self.image = image_data  # the SimpleITK image in the viewer

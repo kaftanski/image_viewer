@@ -40,7 +40,7 @@ class Canvas(FigureCanvas):
 
         FigureCanvas.__init__(self, fig)
         self.setParent(parent)
-        fig = show_in_interactive_figure(itk.imread('/home/paul/Documents/imi_projects/MBV/Projekt/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz'), fig)
+        fig = show_in_interactive_figure(itk.imread('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz'), fig)
         #self.plot()
 
     def plot(self):
