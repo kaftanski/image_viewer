@@ -1,9 +1,44 @@
-from typing import List, Union
+from typing import List, Union, Sequence, Tuple
 
 import SimpleITK as sitk
 import numpy as np
 
 from image_utils import index_compatibility, get_3d_plane_index
+
+
+class Image:
+    def __init__(self, image_array: np.ndarray, spacing: Sequence[float] = None, origin: Sequence[Union[int, float]] = None):
+        # ensure 2D or 3D image
+        image_dim = len(image_array.shape)
+        assert 2 <= image_dim <= 3
+
+        self.image_array = image_array
+        self.spacing = spacing if spacing is not None else np.ones(image_dim)
+        self.origin = origin if origin is not None else np.zeros(image_dim)
+
+    def GetImageArray(self):
+        """
+        @return: the numpy array containing the image intensities
+        """
+        return self.image_array
+
+    def GetSpacing(self) -> Sequence[float]:
+        """
+        @return: the image spacing
+        """
+        return self.spacing
+
+    def GetOrigin(self) -> Sequence[Union[int, float]]:
+        """
+        @return: the image origin
+        """
+        return self.origin
+
+    def GetSize(self) -> Tuple[int]:
+        """
+        @return: the dimensions of the image
+        """
+        return self.image_array.shape
 
 
 class ImageMask:
@@ -44,7 +79,7 @@ class ImageMarker:
     STANDARD_COLOR = 'b'  # follows matplotlib colors definitions
     STANDARD_SIZE = 10  # size of markers in pt
 
-    def __init__(self, pixel_position: List[Union[int, float]]):
+    def __init__(self, pixel_position: Sequence[Union[int, float]]):
         """
         @param pixel_position: 3-dimensional (possibly continouus) index of the marker
         """
