@@ -1,10 +1,11 @@
 from typing import Tuple, Union, Sequence
 
-import SimpleITK as sitk
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colors import ListedColormap
 from matplotlib.image import AxesImage
+
+from image_classes import Image
 
 
 def get_3d_plane_index(slice_index: int, orientation: int) -> Tuple[Union[slice, int]]:
@@ -32,7 +33,7 @@ def get_aspect_ratio_for_plane(spacing: Sequence[float], orientation: int, image
     return ratio
 
 
-def compatible_metadata(image1: sitk.Image, image2: sitk.Image, check_size: bool = True, check_spacing: bool = True, check_origin: bool = True) -> bool:
+def compatible_metadata(image1: Image, image2: Image, check_size: bool = True, check_spacing: bool = True, check_origin: bool = True) -> bool:
     """ Compares the metadata of two images and determines if all checks are successful or not.
     Comparisons are carried out with a small tolerance (0.0001).
 
@@ -78,29 +79,31 @@ def index_compatibility(index: Sequence[int]) -> Sequence[int]:
     @param index: the index to be adapted for the other indexing scheme
     @return: the index for the other indexing scheme
     """
-    # change to the other method (sitk uses x, y, z, numpy uses z, y, x
+    # change to the other method (sitk uses x, y, z, numpy uses z, y, x)
     assert len(index) == 3
     return index[::-1]
 
 
-def pix2world(pixel_coords: Sequence[Union[int, float]], image: sitk.Image) -> Sequence[float]:
-    """ Converts pixel coordinates into world coordinates using the given image.
+def pix2world(pixel_coords: Sequence[Union[int, float]], spacing: Sequence[float]) -> Tuple[float]:
+    """ Converts pixel coordinates into world coordinates using the given voxel spacing.
 
     @param pixel_coords: the pixel coordinates
-    @param image: the image the index belongs to
-    @return: the world coordinates
+    @param spacing: the voxel spacing of an image
+    @return: the continuous world coordinates
     """
-    return image.TransformContinuousIndexToPhysicalPoint(index=pixel_coords)
+    assert len(pixel_coords) == len(spacing)
+    return tuple(i * s for i, s in zip(pixel_coords, spacing))
 
 
-def world2pix(world_coords: Sequence[Union[int, float]], image: sitk.Image) -> Sequence[float]:
-    """ Converts world coordinates into pixel coordinates using the given image.
+def world2pix(world_coords: Sequence[Union[int, float]], spacing: Sequence[float]) -> Tuple[float]:
+    """ Converts world coordinates into pixel coordinates using the given voxel spacing.
 
     @param world_coords: the world coordinates
-    @param image: the image the point belongs to
-    @return: the pixel coordinates
+    @param spacing: the voxel spacing of an image
+    @return: the continuous pixel coordinates
     """
-    return image.TransformPhysicalPointToContinuousIndex(world_coords)
+    assert len(world_coords) == len(spacing)
+    return tuple(i / s for i, s in zip(world_coords, spacing))
 
 
 def add_mask_to_image(ax: Axes, mask: np.ndarray, aspect: float, alpha: float = 0.3, color: str = 'r') -> Union[AxesImage, None]:
