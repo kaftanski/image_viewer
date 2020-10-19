@@ -12,7 +12,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2Q
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
 
-from viewer_utils import add_mask_to_image, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
+from GUI.viewer_utils import add_mask_to_image, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
     get_3d_plane_index, ImageMask, ImageMarker
 
 mpl.rcParams['image.origin'] = 'lower'
@@ -128,7 +128,7 @@ class IMIImageViewer(QtWidgets.QMainWindow):
         message_box = QtWidgets.QMessageBox(self)
         message_box.setWindowTitle('Controls')
         message_box.setTextFormat(QtCore.Qt.RichText)
-        with codecs.open('./controls.html', 'r') as ctrls_html:
+        with codecs.open('controls.html', 'r') as ctrls_html:
             message_box.setText(ctrls_html.read())
 
         message_box.exec_()

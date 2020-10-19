@@ -5,8 +5,8 @@ from typing import List, Union
 import SimpleITK as sitk
 from PyQt5.QtWidgets import QApplication
 
-from viewer_utils import ImageMask
-from imi_image_viewer import IMIImageViewer
+from GUI.viewer_utils import ImageMask
+from GUI.imi_image_viewer import IMIImageViewer
 
 _viewer_queue = []
 
