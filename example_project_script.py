@@ -14,7 +14,7 @@ vis.show_image(smoothed, 'Smoothed Image', blocking=False)
 
 # get seedpoints
 seeds = vis.show_and_return_markers(smoothed, 'Set Seedpoints')
-print(seeds)
+print('Got the following seedpoints:', seeds)
 
 # segmentation
 binary_segmentation = sitk.ConnectedThreshold(smoothed, seeds, lower=650, upper=1000)

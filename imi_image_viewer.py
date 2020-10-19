@@ -26,7 +26,7 @@ SLICE_ORIENTATION_YZ = 0
 SLICE_ORIENTATION = {'xy': 2, 'xz': 1, 'yz': 0}
 
 
-class LightWeightViewer(QtWidgets.QMainWindow):
+class IMIImageViewer(QtWidgets.QMainWindow):
     """ A PyQt window with matplotlib-based viewer of a given image """
     def __init__(self, image: sitk.Image, title: str = '', mask: ImageMask = None):
         """ Constructor with intitial image to be shown
@@ -35,9 +35,9 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         @param title: optionally specify window title
         @param mask: optional initial mask to be shown over the image
         """
-        super(LightWeightViewer, self).__init__()
+        super(IMIImageViewer, self).__init__()
 
-        self.image_viewer = ImageViewer(image, parent=self)
+        self.image_viewer = ImageViewerWidget(image, parent=self)
         if mask is not None:
             self.image_viewer.add_mask(mask)
 
@@ -195,7 +195,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
             self.image_viewer.canvas.print_figure(filename=file_path, dpi=200, bbox_inches=0)
 
 
-class ImageViewer(QtWidgets.QWidget):
+class ImageViewerWidget(QtWidgets.QWidget):
     """ PyQt Widget holding a matplotlib canvas to visualize and navigate through 3D image data
     """
     def __init__(self, image_data: sitk.Image = None, parent: QtWidgets.QWidget = None):
@@ -204,13 +204,10 @@ class ImageViewer(QtWidgets.QWidget):
         @param image_data: the SimpleITK image to visualize
         @param QtWidgets.QWidget parent: the widget's parent if used in a full PyQt GUI
         """
-        super(ImageViewer, self).__init__(parent)
+        super(ImageViewerWidget, self).__init__(parent)
         if image_data is None:
-            # # create an empty 3d image
-            # image_data = sitk.GetImageFromArray(np.zeros((1, 1, 1)))
-            # load example image TODO: remove this
-            image_data = sitk.ReadImage(
-                '/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.MR_DWI_reg.nii.gz')
+            # create an empty 3d image
+            image_data = sitk.GetImageFromArray(np.zeros((1, 1, 1)))
 
         # init attributes
         self.image = image_data  # the SimpleITK image in the viewer
@@ -363,9 +360,8 @@ class ImageViewer(QtWidgets.QWidget):
 
         half_window = self.current_window / 2
         self.im_plot.set_clim(vmin=self.current_level - half_window, vmax=self.current_level + half_window)
-        # self.ax.draw_artist(self.im_plot)
-        self.canvas.draw()  # TODO: only redraw the image, not markers or masks
-        print('Window: {}, Level: {}'.format(self.current_window, self.current_level))
+        self.canvas.draw()  # optimizable: only redraw the image, not markers or masks!
+        # print('Window: {}, Level: {}'.format(self.current_window, self.current_level))
 
     def reset_window_level(self):
         """ Set the window/level to span the entire grey value range of the image.
@@ -393,7 +389,7 @@ class ImageViewer(QtWidgets.QWidget):
         """ Draws the current slice of the image with mask and markers.
         This resets the current zoom factor but not the window/level.
         """
-        # maybe todo: Blitting
+        # here, blitting could increase performance
 
         img_slice = self.image_array[
             index_compatibility(get_3d_plane_index(slice_index=self.current_slice, orientation=self.orientation))]
@@ -442,7 +438,7 @@ class ImageViewer(QtWidgets.QWidget):
         @param delta: the number of steps by which to change the current slice (positive or negative)
         """
         # moves the slider, which in turn changes the slice and redraws the image
-        self.slice_slider.setValue(self.current_slice + delta)  # TODO: kind of a workaround
+        self.slice_slider.setValue(self.current_slice + delta)
 
     def add_marker(self, position: Sequence[Union[float, int]]):
         """ Adds a marker to the given pixel position, saves and displays it.
@@ -627,12 +623,14 @@ class PixelInfoQLabel(QtWidgets.QLabel):
 
 class ImageViewerInteractor:
     """ Handler for all user inputs on the given ImageViewer """
-    def __init__(self, image_viewer: ImageViewer):
+    def __init__(self, image_viewer: ImageViewerWidget, verbose: bool = False):
         """ Init all connections to events, the mpl canvas can produce
 
         @param image_viewer: the image viewer to observe
+        @param verbose: set True, if you want a console output when actions are triggered
         """
         self.iv = image_viewer
+        self.verbose = verbose
 
         # event observing
         self.iv.canvas.mpl_connect('button_press_event', self.handle_mouse_button_down)
@@ -640,7 +638,7 @@ class ImageViewerInteractor:
         self.iv.canvas.mpl_connect('motion_notify_event', self.on_mouse_motion)
         self.iv.canvas.mpl_connect('scroll_event', self.on_mousewheel_event)
         self.iv.canvas.mpl_connect('key_press_event', self.on_key_press)
-        self.iv.canvas.mpl_connect('resize_event', self.on_resize)
+        # self.iv.canvas.mpl_connect('resize_event', self.on_resize)  # unfinished
 
         self.last_mouse_position_in_figure = [0, 0]
         self.window_level_start_position = None  # is set on right mouse down in order to determine the new w/l
@@ -659,7 +657,9 @@ class ImageViewerInteractor:
 
         @param event: the mpl.backend_bases.KeyEvent to handle
         """
-        print(event.key)
+        if self.verbose:
+            print(event.key)
+
         if event.key == 'up':
             self.iv.move_slice(1)
         elif event.key == 'down':
@@ -685,7 +685,9 @@ class ImageViewerInteractor:
 
         @param event: the mpl.backend_bases.MouseEvent to handle
         """
-        print(event.button)
+        if self.verbose:
+            print(event.button)
+
         if event.button == MouseButton.LEFT:
             self.on_left_button_down(event)
         elif event.button == MouseButton.RIGHT:
@@ -699,7 +701,9 @@ class ImageViewerInteractor:
 
         @param event: the mpl.backend_bases.MouseEvent to handle
         """
-        print(event.button, 'up')
+        if self.verbose:
+            print(event.button, 'up')
+
         if event.button == MouseButton.LEFT:
             self.on_left_button_up(event)
         elif event.button == MouseButton.RIGHT:
@@ -834,8 +838,7 @@ class ImageViewerInteractor:
         """
         size_inches = self.iv.canvas.figure.get_size_inches()
         new_dpi = self.iv.max_resolution // min(size_inches)
-        print(size_inches, new_dpi)
-        # TODO
+        # print(size_inches, new_dpi)
         # self.iv.canvas.figure.set_dpi(new_dpi)
         # self.iv.canvas.figure.set_size_inches(size_inches)
         # self.iv.canvas.draw()
@@ -848,10 +851,7 @@ if __name__ == '__main__':
 
     if QtWidgets.QApplication.instance() is None:
         app = QtWidgets.QApplication(sys.argv)
-    # app = QtWidgets.QApplication(sys.argv)
-    w = LightWeightViewer(None)
+
+    w = IMIImageViewer(None)
     w.show()
-    # print('test')
-    # for i in range(1000000):
-    #     print(i)
     sys.exit(QtWidgets.QApplication.instance().exec_())

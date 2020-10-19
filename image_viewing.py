@@ -6,7 +6,7 @@ import SimpleITK as sitk
 from PyQt5.QtWidgets import QApplication
 
 from viewer_utils import ImageMask
-from imi_image_viewer import LightWeightViewer
+from imi_image_viewer import IMIImageViewer
 
 _viewer_queue = []
 
@@ -65,7 +65,7 @@ def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True
         app = QApplication(sys.argv)
 
     # construct the new viewer with the input image
-    widget = LightWeightViewer(image, window_title, mask=mask)
+    widget = IMIImageViewer(image, window_title, mask=mask)
     _viewer_queue.append(widget)
 
     if blocking:
@@ -103,9 +103,3 @@ def _show_viewers_in_queue() -> int:
 
 # register exit hook that shows all previously not shown viewers (happens when the last opened viewer is non blocking)
 atexit.register(_show_viewers_in_queue)
-
-
-if __name__ == '__main__':
-    # print(show_image_with_mask(None, sitk.ReadImage('/home/paul/Documents/imi_projects/MBV/MIPImages/ISLES2015_Train/01/VSD.Brain.01.O.OT_reg.nii.gz')))
-    for m in show_and_return_markers(None, 'test'):
-        print(m)
