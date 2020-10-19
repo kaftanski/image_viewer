@@ -1,11 +1,134 @@
 from typing import Tuple, Union, Sequence
 
+import SimpleITK as sitk
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colors import ListedColormap
 from matplotlib.image import AxesImage
 
-from image_classes import Image
+
+class Image:
+    def __init__(self, image_array: np.ndarray, spacing: Sequence[float] = None, origin: Sequence[Union[int, float]] = None, reverse_indexing: bool = False):
+        # ensure 2D or 3D image
+        image_dim = len(image_array.shape)
+        assert 2 <= image_dim <= 3
+
+        self.image_array = image_array
+        self.spacing = spacing if spacing is not None else np.ones(image_dim)
+        self.origin = origin if origin is not None else np.zeros(image_dim)
+        self.reverse_indexing = reverse_indexing
+
+    def GetImageArray(self):
+        """
+        @return: the numpy array containing the image intensities
+        """
+        return self.image_array
+
+    def GetSpacing(self) -> Sequence[float]:
+        """
+        @return: the image spacing
+        """
+        return self.spacing
+
+    def GetOrigin(self) -> Sequence[Union[int, float]]:
+        """
+        @return: the image origin
+        """
+        return self.origin
+
+    def GetSize(self) -> Tuple[int]:
+        """
+        @return: the dimensions of the image
+        """
+        size = list(self.image_array.shape)
+        if self.reverse_indexing:
+            size = size[::-1]
+        return tuple(size)
+
+    def GetPixel(self, x: int, y: int, z: int = None) -> Union[int, float]:
+        if z is None:
+            assert len(self.GetSize()) == 2, 'Error: Trying to access a 3D image with only 2 indices. ' \
+                                             'If needed, use numpy-like indexing with []-brackets.'
+            return self.image_array[y, x] if self.reverse_indexing else self.image_array[x, y]
+        else:
+            assert len(self.GetSize()) == 3, 'Error: Trying to access a 2D image with 3 indices.'
+            return self.image_array[z, y, x] if self.reverse_indexing else self.image_array[x, y, z]
+
+    def SetPixel(self, value: Union[int, float], x: int, y: int, z: int = None):
+        if z is None:
+            assert len(self.GetSize()) == 2, 'Error: Trying to access a 3D image with only 2 indices. ' \
+                                             'If needed, use numpy-like indexing with []-brackets.'
+
+            if self.reverse_indexing:
+                self.image_array[y, x] = value
+            else:
+                self.image_array[x, y] = value
+        else:
+            assert len(self.GetSize()) == 3, 'Error: Trying to access a 2D image with 3 indices.'
+
+            if self.reverse_indexing:
+                self.image_array[z, y, x] = value
+            else:
+                self.image_array[x, y, z] = value
+
+    def __getitem__(self, item) -> np.ndarray:
+        index_compatibility(item)
+        return self.image_array[item]
+
+    def __setitem__(self, key, value):
+        self.image_array[key] = value
+
+
+class ImageMask:
+    """ image mask container holding a mask image and display parameters """
+    def __init__(self, binary_image: sitk.Image, alpha: float = 0.3, color: str = 'r'):
+        """
+
+        @param binary_image: the image interpreted as a mask
+        @param alpha: the alpha value for the mask overlay (between 0 and 1)
+        @param color: the desired color for the mask (all matplotlib's color definitions are possible)
+        """
+        self.mask_image = binary_image
+        self.mask_as_array = sitk.GetArrayFromImage(self.mask_image)
+        self.alpha = alpha
+        self.color = color
+
+    def get_slice(self, slice_index: int, orientation: int) -> np.ndarray:
+        """ Get a slice from the mask
+
+        @param slice_index: the index in the slicing dimension
+        @param orientation: the slicing dimension
+        @return: a slice from the dimension given in orientation at the given index
+        """
+        return self.mask_as_array[index_compatibility(get_3d_plane_index(slice_index, orientation))]
+
+    def get_spacing(self) -> Sequence[float]:
+        """
+
+        @return: the spacing of the mask image
+        """
+        return self.mask_image.GetSpacing()
+
+
+class ImageMarker:
+    """ image marker container holding a pixel position and the default parameters for displaying markers """
+    # TODO: kind of an unnecessary class
+
+    STANDARD_COLOR = 'b'  # follows matplotlib colors definitions
+    STANDARD_SIZE = 10  # size of markers in pt
+
+    def __init__(self, pixel_position: Sequence[Union[int, float]]):
+        """
+        @param pixel_position: 3-dimensional (possibly continouus) index of the marker
+        """
+        assert len(pixel_position) == 3
+        self.pixel_position = pixel_position
+
+    def __str__(self):
+        """
+        @return: a nicely formatted string displaying the marker's coordinates
+        """
+        return 'ImageMarker at pixel position ({}, {}, {})'.format(*self.pixel_position)
 
 
 def get_3d_plane_index(slice_index: int, orientation: int) -> Tuple[Union[slice, int]]:
@@ -116,7 +239,7 @@ def add_mask_to_image(ax: Axes, mask: np.ndarray, aspect: float, alpha: float = 
     @param aspect: the aspect ratio of the axes
     @param alpha: the alpha value for the mask
     @param color: the color of the mask (use a string matplotlib.colors can interpret)
-    @return: the AxesImage resulting from the
+    @return: the AxesImage resulting from the plot call
     """
     if mask.sum() == 0:
         return None

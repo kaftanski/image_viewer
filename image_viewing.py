@@ -5,8 +5,8 @@ from typing import List, Union
 import SimpleITK as sitk
 from PyQt5.QtWidgets import QApplication
 
-from image_classes import ImageMask
-from lightweight_viewer import LightWeightViewer
+from viewer_utils import ImageMask
+from imi_image_viewer import LightWeightViewer
 
 _viewer_queue = []
 
@@ -23,7 +23,7 @@ def show_image(image: sitk.Image, window_title: str = '', blocking: bool = True)
     return exec_code
 
 
-def show_image_with_mask(image: sitk.Image, mask_image: ImageMask, window_title: str = '', color: str = 'b', blocking: bool=True) -> int:
+def show_image_with_mask(image: sitk.Image, mask_image: sitk.Image, window_title: str = '', color: str = 'b', blocking: bool=True) -> int:
     """ Display an image with a mask overlay
 
     @param image: the image to show

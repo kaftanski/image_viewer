@@ -12,9 +12,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2Q
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
 
-from image_classes import ImageMask, ImageMarker
-from image_utils import get_3d_plane_index, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
-    add_mask_to_image
+from viewer_utils import add_mask_to_image, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
+    get_3d_plane_index, Image, ImageMask, ImageMarker
+
 
 mpl.rcParams['image.origin'] = 'lower'
 mpl.rcParams['image.cmap'] = 'gray'
@@ -120,7 +120,7 @@ class LightWeightViewer(QtWidgets.QMainWindow):
         view_menu.addAction(reset_wl_action)
 
         help_menu = menubar.addMenu('&Help')
-        controls_action = help_menu.addAction('Controls...')
+        controls_action = help_menu.addAction('&Controls...')
         controls_action.triggered.connect(self.show_controls)
 
     def show_controls(self):
@@ -224,7 +224,6 @@ class ImageViewer(QtWidgets.QWidget):
         self.current_level = 0
 
         self.greyval_range = [0, 0]
-        self.current_zoom = 100
 
         self.masks = {}  # dict with mask as key and its plot as value
         self.markers = []  # list of markers and their pixel coordinates
@@ -506,7 +505,7 @@ class ImageViewer(QtWidgets.QWidget):
 
         @param mask: the mask to overlay (has to have the same properties as the image)
         """
-        if not compatible_metadata(self.image, mask.itk_mask):
+        if not compatible_metadata(self.image, mask.mask_image):
             return
 
         # save the mask in the masks dict
@@ -542,7 +541,7 @@ class ImageViewer(QtWidgets.QWidget):
                 # if the mask was not there in the previous slice it is None here
                 pass
 
-    def set_image(self, image: sitk.Image):
+    def set_image(self, image: Image):
         """ Set the image and show it. This resets all markers and masks previously added to the viewer.
 
         @param image: the new image to show
@@ -574,7 +573,7 @@ class ImageViewer(QtWidgets.QWidget):
             x, y, z = [int(ind) for ind in pixel_coords]
             try:
                 self.pixel_info_label.set_values(x, y, z, self.image.GetPixel(x, y, z))
-            except (RuntimeError, TypeError):
+            except (IndexError, RuntimeError, TypeError):
                 # gets thrown if x, y, z are out of bounds of the image (this can happen on the edges of the figure)
                 return
 
@@ -672,6 +671,8 @@ class ImageViewerInteractor:
             self.iv.change_orientation(SLICE_ORIENTATION['xz'])
         elif event.key == 'z':
             self.iv.change_orientation(SLICE_ORIENTATION['xy'])
+        elif event.key == 'r':
+            self.iv.reset_window_level()
         elif event.key == 'pageup':
             # emulate the page-up behaviour of the QSlider (as this is never focused)
             self.iv.move_slice(self.iv.slice_slider.pageStep())
@@ -820,14 +821,11 @@ class ImageViewerInteractor:
             residual = event.step - steps + self.mouse_wheel_step_residual
             adjust = copysign(floor(abs(residual)), residual)
             steps += adjust
+            steps = round(steps)
             self.mouse_wheel_step_residual = residual - adjust  # update the residual
 
         # move slice by steps
         self.iv.move_slice(steps)
-
-        # update the coordinate label to show the new slice
-        self.iv.pixel_info_label.set_coordinate(self.iv.orientation, self.iv.current_slice)
-        self.iv.show_pixel_info(self.iv.pixel_info_label.coords)
 
     def on_resize(self, event: mpl.backend_bases.ResizeEvent):
         """ *TODO* Changes the dpi of the figure, so that the resolution does not change.
