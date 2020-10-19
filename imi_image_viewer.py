@@ -1,7 +1,7 @@
+import codecs
 import os
 from math import floor, copysign
 from typing import Union, List, Sequence
-import codecs
 
 import SimpleITK as sitk
 import matplotlib as mpl
@@ -13,8 +13,7 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
 
 from viewer_utils import add_mask_to_image, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
-    get_3d_plane_index, Image, ImageMask, ImageMarker
-
+    get_3d_plane_index, ImageMask, ImageMarker
 
 mpl.rcParams['image.origin'] = 'lower'
 mpl.rcParams['image.cmap'] = 'gray'
@@ -541,7 +540,7 @@ class ImageViewer(QtWidgets.QWidget):
                 # if the mask was not there in the previous slice it is None here
                 pass
 
-    def set_image(self, image: Image):
+    def set_image(self, image: sitk.Image):
         """ Set the image and show it. This resets all markers and masks previously added to the viewer.
 
         @param image: the new image to show

@@ -7,78 +7,6 @@ from matplotlib.colors import ListedColormap
 from matplotlib.image import AxesImage
 
 
-class Image:
-    def __init__(self, image_array: np.ndarray, spacing: Sequence[float] = None, origin: Sequence[Union[int, float]] = None, reverse_indexing: bool = False):
-        # ensure 2D or 3D image
-        image_dim = len(image_array.shape)
-        assert 2 <= image_dim <= 3
-
-        self.image_array = image_array
-        self.spacing = spacing if spacing is not None else np.ones(image_dim)
-        self.origin = origin if origin is not None else np.zeros(image_dim)
-        self.reverse_indexing = reverse_indexing
-
-    def GetImageArray(self):
-        """
-        @return: the numpy array containing the image intensities
-        """
-        return self.image_array
-
-    def GetSpacing(self) -> Sequence[float]:
-        """
-        @return: the image spacing
-        """
-        return self.spacing
-
-    def GetOrigin(self) -> Sequence[Union[int, float]]:
-        """
-        @return: the image origin
-        """
-        return self.origin
-
-    def GetSize(self) -> Tuple[int]:
-        """
-        @return: the dimensions of the image
-        """
-        size = list(self.image_array.shape)
-        if self.reverse_indexing:
-            size = size[::-1]
-        return tuple(size)
-
-    def GetPixel(self, x: int, y: int, z: int = None) -> Union[int, float]:
-        if z is None:
-            assert len(self.GetSize()) == 2, 'Error: Trying to access a 3D image with only 2 indices. ' \
-                                             'If needed, use numpy-like indexing with []-brackets.'
-            return self.image_array[y, x] if self.reverse_indexing else self.image_array[x, y]
-        else:
-            assert len(self.GetSize()) == 3, 'Error: Trying to access a 2D image with 3 indices.'
-            return self.image_array[z, y, x] if self.reverse_indexing else self.image_array[x, y, z]
-
-    def SetPixel(self, value: Union[int, float], x: int, y: int, z: int = None):
-        if z is None:
-            assert len(self.GetSize()) == 2, 'Error: Trying to access a 3D image with only 2 indices. ' \
-                                             'If needed, use numpy-like indexing with []-brackets.'
-
-            if self.reverse_indexing:
-                self.image_array[y, x] = value
-            else:
-                self.image_array[x, y] = value
-        else:
-            assert len(self.GetSize()) == 3, 'Error: Trying to access a 2D image with 3 indices.'
-
-            if self.reverse_indexing:
-                self.image_array[z, y, x] = value
-            else:
-                self.image_array[x, y, z] = value
-
-    def __getitem__(self, item) -> np.ndarray:
-        index_compatibility(item)
-        return self.image_array[item]
-
-    def __setitem__(self, key, value):
-        self.image_array[key] = value
-
-
 class ImageMask:
     """ image mask container holding a mask image and display parameters """
     def __init__(self, binary_image: sitk.Image, alpha: float = 0.3, color: str = 'r'):
@@ -112,7 +40,6 @@ class ImageMask:
 
 class ImageMarker:
     """ image marker container holding a pixel position and the default parameters for displaying markers """
-    # TODO: kind of an unnecessary class
 
     STANDARD_COLOR = 'b'  # follows matplotlib colors definitions
     STANDARD_SIZE = 10  # size of markers in pt
@@ -156,7 +83,7 @@ def get_aspect_ratio_for_plane(spacing: Sequence[float], orientation: int, image
     return ratio
 
 
-def compatible_metadata(image1: Image, image2: Image, check_size: bool = True, check_spacing: bool = True, check_origin: bool = True) -> bool:
+def compatible_metadata(image1: sitk.Image, image2: sitk.Image, check_size: bool = True, check_spacing: bool = True, check_origin: bool = True) -> bool:
     """ Compares the metadata of two images and determines if all checks are successful or not.
     Comparisons are carried out with a small tolerance (0.0001).
 
