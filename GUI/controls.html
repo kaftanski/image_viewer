@@ -10,20 +10,16 @@ td
 
 <body>
 
-<h1>IMI Image Viewer Controls</h1>
+<b>Left click</b><br>
+Place a marker at the current mouse position.<br><br>
 
-<h2>Mouse buttons</h2>
+<b>Right click</b><br>
+Click and hold to change window and level of the image. By moving the mouse upwards or downwards, to increase or decrease the level. Moving the mouse right or left widens or shrinks the window.<br><br>
 
-<h3>Left click</h3>
-<p>Place a marker at the current mouse position.</p>
+<b>Middle click</b><br>
+Toggle pan/zoom mode. Left click and drag now pans the image, right click and drag zooms in or out.<br><br>
 
-<h3>Right click</h3>
-<p>Click and hold to change window and level of the image. By moving the mouse upwards or downwards, to increase or decrease the level. Moving the mouse right or left widens or shrinks the window.</p>
-
-<h3>Middle click</h3>
-<p>Toggle pan/zoom mode. Left click and drag now pans the image, right click and drag zooms in or out.</p>
-
-<h2>Key bindings</h2>
+<b>Key bindings:</b><br>
 <table>
 	<tr>
 		<td>x</td>
@@ -37,10 +33,12 @@ td
 		<td>z</td>
 		<td>change orientation of the image to the XY plane (axial view)</td>
 	</tr>
+	<tr></tr>
 	<tr>
 		<td>r</td>
 		<td>reset window/level settings</td>
 	</tr>
+	<tr></tr>
 	<tr>
 		<td>arrow-up</td>
 		<td>move one slice forward</td>
@@ -49,6 +47,7 @@ td
 		<td>arrow-down</td>
 		<td>move one slice back</td>
 	</tr>
+	<tr></tr>
 	<tr>
 		<td>page-up</td>
 		<td>move multiple slices forward</td>
@@ -56,6 +55,28 @@ td
 	<tr>
 		<td>page-down</td>
 		<td>move multiple slices back</td>
+	</tr>
+	<tr></tr>
+	<tr>
+		<td>ctrl + z</td>
+		<td>remove the last marker</td>
+	</tr>
+	<tr></tr>
+	<tr>
+		<td>ctrl + o</td>
+		<td>open an image (replaces the one currently viewed)</td>
+	</tr>
+	<tr>
+		<td>ctrl + m</td>
+		<td>open a segmentation mask (should be a binary image with matching image metadata as the currently viewed image)</td>
+	</tr>
+	<tr>
+		<td>ctrl + s</td>
+		<td>save the current view as a .PNG file</td>
+	</tr>
+	<tr>
+		<td>ctrl + q</td>
+		<td>quit the application</td>
 	</tr>
 </table>
 
