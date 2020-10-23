@@ -134,28 +134,6 @@ def index_compatibility(index: Sequence[int]) -> Sequence[int]:
     return index[::-1]
 
 
-def pix2world(pixel_coords: Sequence[Union[int, float]], spacing: Sequence[float]) -> Tuple[float]:
-    """ Converts pixel coordinates into world coordinates using the given voxel spacing.
-
-    @param pixel_coords: the pixel coordinates
-    @param spacing: the voxel spacing of an image
-    @return: the continuous world coordinates
-    """
-    assert len(pixel_coords) == len(spacing)
-    return tuple(i * s for i, s in zip(pixel_coords, spacing))
-
-
-def world2pix(world_coords: Sequence[Union[int, float]], spacing: Sequence[float]) -> Tuple[float]:
-    """ Converts world coordinates into pixel coordinates using the given voxel spacing.
-
-    @param world_coords: the world coordinates
-    @param spacing: the voxel spacing of an image
-    @return: the continuous pixel coordinates
-    """
-    assert len(world_coords) == len(spacing)
-    return tuple(i / s for i, s in zip(world_coords, spacing))
-
-
 def add_mask_to_image(ax: Axes, mask: np.ndarray, aspect: float, alpha: float = 0.3, color: str = 'r') -> Union[AxesImage, None]:
     """ Add a single label mask an an alpha channel to the given axis.
     Any value in the mask not equal to 0 is considered as object, pixels with value 0 are considered as background.
