@@ -118,7 +118,7 @@ class MPLImageViewer:
         """
         # DON'T swap axes, in order to keep the fastest dimension of the np array the first
         # -> z-slices are the most performant
-        self.image_array = self.image.GetImageArray()#sitk.GetArrayFromImage(self.image)
+        self.image_array = self.image.GetImageArray()
 
         # redraw if there is already a plot
         if self.im_plot is not None:
