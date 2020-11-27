@@ -7,10 +7,21 @@ import SimpleITK as sitk
 import matplotlib as mpl
 import numpy as np
 from PyQt5.QtWidgets import QAction
-from matplotlib.backend_bases import MouseButton, cursors
+from matplotlib.backend_bases import cursors
 from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
+
+try:
+    from matplotlib.backend_bases import MouseButton
+except ImportError as e:
+    # for compatibility with older Matplotlib versions (i.e. 2.1.1), where the MouseButton enum is not yet defined
+    import enum
+
+    class MouseButton(enum.IntEnum):
+        LEFT = 1
+        MIDDLE = 2
+        RIGHT = 3
 
 from GUI.viewer_utils import add_mask_to_image, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
     get_3d_plane_index, ImageMask, ImageMarker
