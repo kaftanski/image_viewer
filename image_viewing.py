@@ -1,12 +1,12 @@
 import atexit
 import sys
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import SimpleITK as sitk
 from PyQt5.QtWidgets import QApplication
 
-from GUI.viewer_utils import ImageMask
 from GUI.imi_image_viewer import IMIImageViewer
+from GUI.viewer_utils import ImageMask
 
 _viewer_queue = []
 
@@ -23,7 +23,7 @@ def show_image(image: sitk.Image, window_title: str = '', blocking: bool = True)
     return exec_code
 
 
-def show_image_with_mask(image: sitk.Image, mask_image: sitk.Image, window_title: str = '', color: str = 'b', blocking: bool=True) -> int:
+def show_image_with_mask(image: sitk.Image, mask_image: sitk.Image, window_title: str = '', color: Union[str, Tuple[int]] = 'b', blocking: bool=True) -> int:
     """ Display an image with a mask overlay
 
     @param image: the image to show
