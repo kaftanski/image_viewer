@@ -1,5 +1,6 @@
 import codecs
 import os
+from glob import glob
 from math import floor, copysign
 from typing import Union, List, Sequence
 
@@ -139,7 +140,7 @@ class IMIImageViewer(QtWidgets.QMainWindow):
         message_box = QtWidgets.QMessageBox(self)
         message_box.setWindowTitle('Controls')
         message_box.setTextFormat(QtCore.Qt.RichText)
-        with codecs.open('controls.html', 'r') as ctrls_html:
+        with codecs.open((glob('controls.html') + glob('*/controls.html'))[0], 'r') as ctrls_html:
             message_box.setText(ctrls_html.read())
 
         message_box.exec_()
