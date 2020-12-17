@@ -476,9 +476,11 @@ class ImageViewerWidget(QtWidgets.QWidget):
             return
 
         if only_last:
-            self.markers.pop()
+            removed_marker = self.markers.pop()
+            print('removed marker at {}'.format(removed_marker.pixel_position))
         else:
             self.markers.clear()
+            print('removed all markers')
 
         # redraw markers
         self.scatter_markers()
@@ -843,8 +845,9 @@ class ImageViewerInteractor:
         self.iv.move_slice(steps)
 
     def on_resize(self, event: mpl.backend_bases.ResizeEvent):
-        """ *TODO* Changes the dpi of the figure, so that the resolution does not change.
+        """ Changes the dpi of the figure, so that the resolution does not change.
         Aims to increase performance on large window sizes.
+        *** not done, not used ***
 
         @param event: the mpl.backend_bases.ResizeEvent to handle
         """
