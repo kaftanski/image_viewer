@@ -79,7 +79,7 @@ def get_aspect_ratio_for_plane(spacing: Sequence[float], orientation: int, image
     @return: the aspect ratio between the two plane dimensions
     """
     dims = list(d for d in range(3) if d != orientation)
-    ratio = spacing[dims[1]] * image_dimensions[1] / (spacing[dims[0]] * image_dimensions[0])
+    ratio = spacing[dims[1]] / spacing[dims[0]]
     return ratio
 
 
