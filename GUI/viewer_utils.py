@@ -70,12 +70,11 @@ def get_3d_plane_index(slice_index: int, orientation: int) -> Tuple[Union[slice,
     return tuple(index)
 
 
-def get_aspect_ratio_for_plane(spacing: Sequence[float], orientation: int, image_dimensions: Sequence[int]) -> float:
+def get_aspect_ratio_for_plane(spacing: Sequence[float], orientation: int) -> float:
     """ Computes the necessary aspect ratio for two axes given a spacing
 
     @param spacing: the spacing for all 3 dimensions
     @param orientation: the current slicing dimension
-    @param image_dimensions: the size of all dimensions
     @return: the aspect ratio between the two plane dimensions
     """
     dims = list(d for d in range(3) if d != orientation)
