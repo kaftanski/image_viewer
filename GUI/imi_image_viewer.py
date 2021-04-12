@@ -27,7 +27,7 @@ except ImportError as e:
 from GUI.viewer_utils import add_mask_to_image, get_aspect_ratio_for_plane, compatible_metadata, index_compatibility, \
     get_3d_plane_index, ImageMask, ImageMarker
 
-mpl.rcParams['image.origin'] = 'lower'
+mpl.rcParams['image.origin'] = 'upper'
 mpl.rcParams['image.cmap'] = 'gray'
 
 
@@ -220,6 +220,18 @@ class ImageViewerWidget(QtWidgets.QWidget):
         if image_data is None:
             # create an empty 3d image
             image_data = sitk.GetImageFromArray(np.zeros((1, 1, 1)))
+        elif image_data.GetDimension() == 2:
+            data_array = np.expand_dims(sitk.GetArrayFromImage(image_data), axis=0)
+            spacing = (*image_data.GetSpacing(), 1.0)
+            origin = (*image_data.GetOrigin(), 0.0)
+            direction = (image_data.GetDirection())
+            direction = (*direction[0:2], 0.0, *direction[2:4], 0.0, 0.0, 0.0, 1.0)
+            image_data = sitk.GetImageFromArray(data_array)
+            image_data.SetSpacing(spacing)
+            image_data.SetOrigin(origin)
+            image_data.SetDirection(direction)
+        elif image_data.GetDimension() not in (2, 3):
+            raise ValueError('Image Viewer does not support {}-dimensional images'.format(image_data.GetDimension()))
 
         # init attributes
         self.image = image_data  # the SimpleITK image in the viewer
