@@ -3,6 +3,7 @@ import sys
 from typing import List, Union, Tuple
 
 import SimpleITK as sitk
+import numpy as np
 from PyQt5.QtWidgets import QApplication
 
 from GUI.imi_image_viewer import IMIImageViewer
@@ -51,7 +52,8 @@ def show_and_return_markers(image: sitk.Image, window_title: str = '') -> List[L
     return markers
 
 
-def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True, mask: ImageMask = None, return_markers: bool = False) -> Union[int, List[List[int]]]:
+def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True, mask: ImageMask = None, return_markers: bool = False,
+                points: List[List[Union[float, int]]] = None) -> Union[int, List[List[int]]]:
     """ Function to access all image viewing functionality (do not call this directly!)
 
     @param image: the image to show
@@ -66,7 +68,7 @@ def _show_image(image: sitk.Image, window_title: str = '', blocking: bool = True
         app = QApplication(sys.argv)
 
     # construct the new viewer with the input image
-    widget = IMIImageViewer(image, window_title, mask=mask)
+    widget = IMIImageViewer(image, window_title, mask=mask, markers=points)
     _viewer_queue.append(widget)
 
     if blocking:

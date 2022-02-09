@@ -40,7 +40,7 @@ SLICE_ORIENTATION = {'xy': 2, 'xz': 1, 'yz': 0}
 
 class IMIImageViewer(QtWidgets.QMainWindow):
     """ A PyQt window with matplotlib-based viewer of a given image """
-    def __init__(self, image: sitk.Image, title: str = '', mask: ImageMask = None):
+    def __init__(self, image: sitk.Image, title: str = '', mask: ImageMask = None, markers: List[List[Union[float, int]]] = None):
         """ Constructor with intitial image to be shown
 
         @param image: SimpleITK Image to be shown
@@ -52,6 +52,9 @@ class IMIImageViewer(QtWidgets.QMainWindow):
         self.image_viewer = ImageViewerWidget(image, parent=self)
         if mask is not None:
             self.image_viewer.add_mask(mask)
+        if markers is not None:
+            self.image_viewer.markers.extend([ImageMarker(m) for m in markers])
+            self.image_viewer.redraw_slice()
 
         self.setCentralWidget(self.image_viewer)
         self.init_menu_bar()
