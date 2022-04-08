@@ -9,7 +9,7 @@ from matplotlib.image import AxesImage
 
 class ImageMask:
     """ image mask container holding a mask image and display parameters """
-    def __init__(self, binary_image: sitk.Image, alpha: float = 0.3, color: Union[str, Tuple[int]] = 'r'):
+    def __init__(self, binary_image: sitk.Image, alpha: float = 0.5, color: Union[str, Tuple[int]] = 'r'):
         """
 
         @param binary_image: the image interpreted as a mask
@@ -145,10 +145,12 @@ def add_mask_to_image(ax: Axes, mask: np.ndarray, aspect: float, alpha: float = 
     @param color: the color of the mask (use a string matplotlib.colors can interpret)
     @return: the AxesImage resulting from the plot call
     """
-    if mask.sum() == 0:
+    if np.all(mask == 0):
         return None
 
-    cmap = ListedColormap([color])
+    colors = ['r', 'g', 'b', 'y', 'cyan', 'purple']
+
+    cmap = ListedColormap(colors[:len(np.unique(mask))-1])
     mask = np.ma.masked_where(mask == 0, mask)
     plot = ax.matshow(mask, aspect=aspect, cmap=cmap, alpha=alpha)
 
